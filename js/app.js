@@ -155,7 +155,7 @@ async function renderBuyersList(params) {
       <a href="/buyers" class="btn btn-sm">Clear</a>
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>Name</th><th>Status</th><th>Strategy</th><th>Price Range</th><th>Zips</th><th>Condition</th><th>Funding</th><th>POF</th><th>Deals</th><th>Next F/U</th></tr>
+      <tr><th>Name</th><th>Status</th><th>Strategy</th><th>Price Range</th><th>Zips</th><th>Condition</th><th>Funding</th><th>POF</th><th>Deals</th><th>Next F/U</th><th></th></tr>
       ${filtered.map(b => `<tr>
         <td><a href="/buyers/${b.id}"><strong>${b.name}</strong></a>${b.entity_name ? `<br><span class="text-muted text-sm">${b.entity_name}</span>` : ''}</td>
         <td>${badge(b.status, buyerStatusColor(b.status))}</td>
@@ -167,8 +167,9 @@ async function renderBuyersList(params) {
         <td>${b.proof_of_funds_verified ? badge('✓','green') : badge('–','gray')}</td>
         <td>${b.deals_last_12_months}</td>
         <td class="text-sm">${b.next_followup || ''}</td>
+        <td style="white-space:nowrap;"><a href="/buyers/${b.id}/edit" class="btn btn-sm">Edit</a> <button class="btn btn-sm btn-danger" onclick="deleteBuyer(${b.id})">Del</button></td>
       </tr>`).join('')}
-      ${filtered.length === 0 ? '<tr><td colspan="10" class="text-muted" style="text-align:center;padding:24px;">No buyers found.</td></tr>' : ''}
+      ${filtered.length === 0 ? '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:24px;">No buyers found.</td></tr>' : ''}
     </table></div>`;
 
     window._buyersData = buyers;
@@ -385,7 +386,7 @@ async function renderPropertiesList(params) {
       <a href="/properties" class="btn btn-sm">Clear</a>
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>Address</th><th>Price</th><th>MAO</th><th>Spread</th><th>DOM</th><th>Beds/Ba</th><th>Sqft</th><th>Type</th><th>Cond</th><th>ADU</th><th>Status</th><th>Matches</th></tr>
+      <tr><th>Address</th><th>Price</th><th>MAO</th><th>Spread</th><th>DOM</th><th>Beds/Ba</th><th>Sqft</th><th>Type</th><th>Cond</th><th>ADU</th><th>Status</th><th>Matches</th><th></th></tr>
       ${filtered.map(p => {
         const spread = (p.mao||0) - (p.list_price||0);
         const matchCount = getMatchingBuyers(p, allBuyers||[]).length;
@@ -400,9 +401,10 @@ async function renderPropertiesList(params) {
           <td>${p.adu_potential ? badge('ADU','green') : ''}</td>
           <td>${badge(p.status, propStatusColor(p.status))}</td>
           <td>${badge(matchCount, 'blue')}</td>
+          <td style="white-space:nowrap;"><a href="/properties/${p.id}/edit" class="btn btn-sm">Edit</a> <button class="btn btn-sm btn-danger" onclick="deleteProperty(${p.id})">Del</button></td>
         </tr>`;
       }).join('')}
-      ${filtered.length===0?'<tr><td colspan="12" class="text-muted" style="text-align:center;padding:24px;">No properties found.</td></tr>':''}
+      ${filtered.length===0?'<tr><td colspan="13" class="text-muted" style="text-align:center;padding:24px;">No properties found.</td></tr>':''}
     </table></div>`;
 }
 
@@ -657,7 +659,7 @@ async function renderContactsList(params) {
         <td>${badge(c.role,'orange')}</td><td>${c.company||'—'}</td>
         <td>${c.phone||'—'}</td><td>${c.email||'—'}</td>
         <td>${c.next_followup||'—'}</td>
-        <td><a href="/contacts/${c.id}/edit" class="btn btn-sm">Edit</a></td>
+        <td style="white-space:nowrap;"><a href="/contacts/${c.id}/edit" class="btn btn-sm">Edit</a> <button class="btn btn-sm btn-danger" onclick="deleteContact(${c.id})">Del</button></td>
       </tr>`).join('')}
       ${filtered.length===0?'<tr><td colspan="7" class="text-muted" style="text-align:center;padding:24px;">No contacts.</td></tr>':''}
     </table></div>`;
