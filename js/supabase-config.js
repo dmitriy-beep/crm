@@ -1,7 +1,7 @@
 const SUPABASE_URL = 'https://cjkpcvvoqbkruzmexmam.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqa3BjdnZvcWJrcnV6bWV4bWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTAxMzcsImV4cCI6MjA4OTQ2NjEzN30.Unk_5PWrvTvwdPMMpAhFBXce8EunIqdUB7sFYaLb0xg';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Condition ranking for matching
 const CONDITION_RANK = { turnkey: 1, cosmetic: 2, medium_rehab: 3, full_gut: 4 };

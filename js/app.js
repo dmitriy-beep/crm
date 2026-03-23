@@ -52,10 +52,10 @@ async function renderDashboard() {
     const todayStr = today();
 
     const [{ data: buyers }, { data: properties }, { data: contacts }, { data: activities }] = await Promise.all([
-        supabase.from('buyers').select('*'),
-        supabase.from('properties').select('*'),
-        supabase.from('contacts').select('*'),
-        supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20)
+        db.from('buyers').select('*'),
+        db.from('properties').select('*'),
+        db.from('contacts').select('*'),
+        db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20)
     ]);
 
     // Follow-ups
@@ -119,7 +119,7 @@ async function renderDashboard() {
 // ── Buyers List ─────────────────────────────────────────────────────────────
 async function renderBuyersList(params) {
     app.innerHTML = '<div class="loading">Loading buyers…</div>';
-    let query = supabase.from('buyers').select('*').order('name');
+    let query = db.from('buyers').select('*').order('name');
 
     const { data: buyers, error } = await query;
     let filtered = buyers || [];
@@ -184,7 +184,7 @@ window.filterBuyers = () => {
 };
 
 window.exportBuyers = async () => {
-    const { data } = await supabase.from('buyers').select('*').order('name');
+    const { data } = await db.from('buyers').select('*').order('name');
     if (data) exportCSV(data, 'buyers.csv');
 };
 
@@ -192,7 +192,7 @@ window.exportBuyers = async () => {
 async function renderBuyerForm(id) {
     let buyer = null;
     if (id) {
-        const { data } = await supabase.from('buyers').select('*').eq('id', id).single();
+        const { data } = await db.from('buyers').select('*').eq('id', id).single();
         buyer = data;
     }
     const v = (field) => buyer ? (buyer[field] ?? '') : '';
@@ -258,9 +258,9 @@ window.saveBuyer = async (action) => {
     const id = window._editBuyerId;
     let result;
     if (id) {
-        result = await supabase.from('buyers').update(data).eq('id', id);
+        result = await db.from('buyers').update(data).eq('id', id);
     } else {
-        result = await supabase.from('buyers').insert(data);
+        result = await db.from('buyers').insert(data);
     }
 
     if (result.error) { flash(result.error.message, 'error'); return; }
@@ -271,8 +271,8 @@ window.saveBuyer = async (action) => {
 
 window.deleteBuyer = async (id) => {
     if (!confirm('Delete this buyer?')) return;
-    await supabase.from('activity_log').delete().eq('contact_type', 'buyer').eq('contact_id', id);
-    await supabase.from('buyers').delete().eq('id', id);
+    await db.from('activity_log').delete().eq('contact_type', 'buyer').eq('contact_id', id);
+    await db.from('buyers').delete().eq('id', id);
     flash('Buyer deleted');
     navigate('/buyers');
 };
@@ -281,9 +281,9 @@ window.deleteBuyer = async (id) => {
 async function renderBuyerDetail(id) {
     app.innerHTML = '<div class="loading">Loading…</div>';
     const [{ data: buyer }, { data: allProps }, { data: activities }] = await Promise.all([
-        supabase.from('buyers').select('*').eq('id', id).single(),
-        supabase.from('properties').select('*'),
-        supabase.from('activity_log').select('*').eq('contact_type', 'buyer').eq('contact_id', id).order('created_at', { ascending: false })
+        db.from('buyers').select('*').eq('id', id).single(),
+        db.from('properties').select('*'),
+        db.from('activity_log').select('*').eq('contact_type', 'buyer').eq('contact_id', id).order('created_at', { ascending: false })
     ]);
 
     if (!buyer) { flash('Buyer not found', 'error'); navigate('/buyers'); return; }
@@ -347,8 +347,8 @@ async function renderBuyerDetail(id) {
 async function renderPropertiesList(params) {
     app.innerHTML = '<div class="loading">Loading properties…</div>';
     const [{ data: properties }, { data: allBuyers }] = await Promise.all([
-        supabase.from('properties').select('*').order('created_at', { ascending: false }),
-        supabase.from('buyers').select('*')
+        db.from('properties').select('*').order('created_at', { ascending: false }),
+        db.from('buyers').select('*')
     ]);
 
     let filtered = properties || [];
@@ -419,7 +419,7 @@ window.filterProps = () => {
 };
 
 window.exportProperties = async () => {
-    const { data } = await supabase.from('properties').select('*');
+    const { data } = await db.from('properties').select('*');
     if (data) exportCSV(data, 'properties.csv');
 };
 
@@ -427,7 +427,7 @@ window.exportProperties = async () => {
 async function renderPropertyForm(id) {
     let prop = null;
     if (id) {
-        const { data } = await supabase.from('properties').select('*').eq('id', id).single();
+        const { data } = await db.from('properties').select('*').eq('id', id).single();
         prop = data;
     }
     const v = (f) => prop ? (prop[f] ?? '') : '';
@@ -531,8 +531,8 @@ window.saveProperty = async (action) => {
 
     const id = window._editPropId;
     const result = id
-        ? await supabase.from('properties').update(data).eq('id', id)
-        : await supabase.from('properties').insert(data);
+        ? await db.from('properties').update(data).eq('id', id)
+        : await db.from('properties').insert(data);
 
     if (result.error) { flash(result.error.message, 'error'); return; }
     flash(id ? 'Property updated' : 'Property added');
@@ -542,7 +542,7 @@ window.saveProperty = async (action) => {
 
 window.deleteProperty = async (id) => {
     if (!confirm('Delete this property?')) return;
-    await supabase.from('properties').delete().eq('id', id);
+    await db.from('properties').delete().eq('id', id);
     flash('Property deleted');
     navigate('/properties');
 };
@@ -551,9 +551,9 @@ window.deleteProperty = async (id) => {
 async function renderPropertyDetail(id) {
     app.innerHTML = '<div class="loading">Loading…</div>';
     const [{ data: prop }, { data: allBuyers }, { data: activities }] = await Promise.all([
-        supabase.from('properties').select('*').eq('id', id).single(),
-        supabase.from('buyers').select('*'),
-        supabase.from('activity_log').select('*').order('created_at', { ascending: false })
+        db.from('properties').select('*').eq('id', id).single(),
+        db.from('buyers').select('*'),
+        db.from('activity_log').select('*').order('created_at', { ascending: false })
     ]);
 
     if (!prop) { flash('Property not found', 'error'); navigate('/properties'); return; }
@@ -629,7 +629,7 @@ async function renderPropertyDetail(id) {
 // ── Contacts List ───────────────────────────────────────────────────────────
 async function renderContactsList(params) {
     app.innerHTML = '<div class="loading">Loading contacts…</div>';
-    const { data: contacts } = await supabase.from('contacts').select('*').order('name');
+    const { data: contacts } = await db.from('contacts').select('*').order('name');
     let filtered = contacts || [];
     const search = params?.get('search');
     const role = params?.get('role');
@@ -670,14 +670,14 @@ window.filterContacts = () => {
     navigate('/contacts' + (params.toString() ? '?' + params : ''));
 };
 window.exportContacts = async () => {
-    const { data } = await supabase.from('contacts').select('*');
+    const { data } = await db.from('contacts').select('*');
     if (data) exportCSV(data, 'contacts.csv');
 };
 
 // ── Contact Form ────────────────────────────────────────────────────────────
 async function renderContactForm(id) {
     let contact = null;
-    if (id) { const { data } = await supabase.from('contacts').select('*').eq('id', id).single(); contact = data; }
+    if (id) { const { data } = await db.from('contacts').select('*').eq('id', id).single(); contact = data; }
     const v = (f) => contact ? (contact[f] ?? '') : '';
     const sel = (f, val) => contact && contact[f] === val ? 'selected' : '';
 
@@ -709,7 +709,7 @@ window.saveContact = async (action) => {
     const fd = new FormData(document.getElementById('contactForm'));
     const data = { name: fd.get('name'), phone: fd.get('phone')||null, email: fd.get('email')||null, role: fd.get('role'), company: fd.get('company')||null, notes: fd.get('notes')||null, last_contacted: fd.get('last_contacted')||null, next_followup: fd.get('next_followup')||null };
     const id = window._editContactId;
-    const result = id ? await supabase.from('contacts').update(data).eq('id', id) : await supabase.from('contacts').insert(data);
+    const result = id ? await db.from('contacts').update(data).eq('id', id) : await db.from('contacts').insert(data);
     if (result.error) { flash(result.error.message, 'error'); return; }
     flash(id ? 'Contact updated' : 'Contact added');
     if (action === 'save_add') navigate('/contacts/new');
@@ -718,7 +718,7 @@ window.saveContact = async (action) => {
 
 window.deleteContact = async (id) => {
     if (!confirm('Delete?')) return;
-    await supabase.from('contacts').delete().eq('id', id);
+    await db.from('contacts').delete().eq('id', id);
     flash('Contact deleted'); navigate('/contacts');
 };
 
@@ -726,8 +726,8 @@ window.deleteContact = async (id) => {
 async function renderContactDetail(id) {
     app.innerHTML = '<div class="loading">Loading…</div>';
     const [{ data: contact }, { data: activities }] = await Promise.all([
-        supabase.from('contacts').select('*').eq('id', id).single(),
-        supabase.from('activity_log').select('*').in('contact_type', ['listing_agent','other']).eq('contact_id', id).order('created_at', { ascending: false })
+        db.from('contacts').select('*').eq('id', id).single(),
+        db.from('activity_log').select('*').in('contact_type', ['listing_agent','other']).eq('contact_id', id).order('created_at', { ascending: false })
     ]);
     if (!contact) { flash('Contact not found','error'); navigate('/contacts'); return; }
 
@@ -758,9 +758,9 @@ async function renderContactDetail(id) {
 async function renderActivitiesList(params) {
     app.innerHTML = '<div class="loading">Loading activities…</div>';
     const [{ data: activities }, { data: buyers }, { data: contacts }] = await Promise.all([
-        supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('buyers').select('id,name'),
-        supabase.from('contacts').select('id,name')
+        db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(100),
+        db.from('buyers').select('id,name'),
+        db.from('contacts').select('id,name')
     ]);
 
     let filtered = activities || [];
@@ -812,8 +812,8 @@ window.filterActs = () => {
 // ── Activity Form ───────────────────────────────────────────────────────────
 async function renderActivityForm(params) {
     const [{ data: buyers }, { data: contacts }] = await Promise.all([
-        supabase.from('buyers').select('id,name').order('name'),
-        supabase.from('contacts').select('id,name,role').order('name')
+        db.from('buyers').select('id,name').order('name'),
+        db.from('contacts').select('id,name,role').order('name')
     ]);
 
     const preType = params?.get('contact_type') || '';
@@ -881,7 +881,7 @@ window.saveActivity = async (action) => {
         followup_date: fd.get('followup_date') || null,
     };
 
-    const result = await supabase.from('activity_log').insert(data);
+    const result = await db.from('activity_log').insert(data);
     if (result.error) { flash(result.error.message, 'error'); return; }
 
     // Update last_contacted on the contact
@@ -889,11 +889,11 @@ window.saveActivity = async (action) => {
     if (data.contact_type === 'buyer') {
         const upd = { last_contacted: todayStr };
         if (data.followup_needed && data.followup_date) upd.next_followup = data.followup_date;
-        await supabase.from('buyers').update(upd).eq('id', data.contact_id);
+        await db.from('buyers').update(upd).eq('id', data.contact_id);
     } else if (['listing_agent', 'other'].includes(data.contact_type)) {
         const upd = { last_contacted: todayStr };
         if (data.followup_needed && data.followup_date) upd.next_followup = data.followup_date;
-        await supabase.from('contacts').update(upd).eq('id', data.contact_id);
+        await db.from('contacts').update(upd).eq('id', data.contact_id);
     }
 
     flash('Activity logged');

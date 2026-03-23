@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DealEngine CRM</title>
 <link rel="stylesheet" href="/css/style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="topbar">
@@ -18,15 +17,16 @@
     <a href="/activities" data-page="activities">Activity Log</a>
   </nav>
   <div class="quick-actions">
-    <a href="/buyers/new" class="btn btn-sm" data-page="buyer-form">+ Buyer</a>
-    <a href="/properties/new" class="btn btn-sm" data-page="property-form">+ Property</a>
-    <a href="/activities/new" class="btn btn-sm btn-primary" data-page="activity-form">+ Log Activity</a>
+    <a href="/buyers/new" class="btn btn-sm">+ Buyer</a>
+    <a href="/properties/new" class="btn btn-sm">+ Property</a>
+    <a href="/activities/new" class="btn btn-sm btn-primary">+ Log Activity</a>
   </div>
 </div>
 <div class="container" id="app">
   <div class="loading">Loading…</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/supabase-config.js"></script>
 <script src="/js/app.js"></script>
 </body>
