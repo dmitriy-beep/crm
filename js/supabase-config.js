@@ -24,7 +24,7 @@ function badge(text, color) {
         green: 'badge-green', yellow: 'badge-yellow', red: 'badge-red',
         blue: 'badge-blue', gray: 'badge-gray', orange: 'badge-orange'
     };
-    return `<span class="badge ${colors[color] || 'badge-gray'}">${(text || '').replace(/_/g, ' ')}</span>`;
+    return `<span class="badge ${colors[color] || 'badge-gray'}">${String(text ?? '').replace(/_/g, ' ')}</span>`;
 }
 
 // Helper: status badge color
