@@ -904,6 +904,8 @@ window.saveActivity = async (action) => {
 };
 
 // ── Init ────────────────────────────────────────────────────────────────────
-if (checkAuth()) {
-    route(location.pathname + location.search);
-}
+(async () => {
+    if (await checkAuth()) {
+        route(location.pathname + location.search);
+    }
+})();

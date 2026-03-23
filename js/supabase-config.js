@@ -142,18 +142,66 @@ function getMatchingProperties(buyer, properties) {
     return matches;
 }
 
-// Simple auth gate — password stored in localStorage
-const APP_PASSWORD = null; // Set to a string like 'mypassword123' to enable, or null to disable
+// Simple auth gate — uses Supabase Auth
+const APP_PASSWORD = null; // no longer used
 
-function checkAuth() {
-    if (!APP_PASSWORD) return true;
-    const stored = localStorage.getItem('dealengine_auth');
-    if (stored === APP_PASSWORD) return true;
-    const pw = prompt('Enter password:');
-    if (pw === APP_PASSWORD) {
-        localStorage.setItem('dealengine_auth', pw);
-        return true;
-    }
-    document.body.innerHTML = '<div style="padding:40px;color:#f87171;font-size:18px;">Access denied.</div>';
+async function checkAuth() {
+    const { data: { session } } = await db.auth.getSession();
+    if (session) return true;
+    showLogin();
     return false;
 }
+
+function showLogin() {
+    app.innerHTML = `
+    <div style="max-width:360px;margin:80px auto;">
+      <div class="card">
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:20px;font-weight:700;">Deal<span style="color:var(--accent);">Engine</span></div>
+          <div class="text-muted text-sm" style="margin-top:4px;">Sign in to continue</div>
+        </div>
+        <form id="loginForm">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" required autofocus>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required>
+          </div>
+          <div id="loginError" style="color:var(--red);font-size:13px;margin-bottom:8px;display:none;"></div>
+          <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Sign In</button>
+        </form>
+      </div>
+    </div>`;
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const form = e.target;
+    const email = form.email.value;
+    const password = form.password.value;
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+
+    const btn = form.querySelector('button');
+    btn.textContent = 'Signing in…';
+    btn.disabled = true;
+
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+        return;
+    }
+    route(location.pathname + location.search);
+}
+
+// Sign out function
+window.signOut = async () => {
+    await db.auth.signOut();
+    showLogin();
+};
