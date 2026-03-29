@@ -80,7 +80,10 @@ function getMatchingBuyers(property, buyers) {
 
     for (const b of buyers) {
         if (b.status === 'inactive') continue;
-        const buyerZips = (b.zip_codes || '').split(',').map(z => z.trim()).filter(Boolean);
+        // Skip buyers with incomplete criteria (e.g. unvetted imports)
+        if (!b.zip_codes || !b.property_types || !b.condition_tolerance) continue;
+
+        const buyerZips = b.zip_codes.split(',').map(z => z.trim()).filter(Boolean);
         if (!buyerZips.includes(property.zip_code)) continue;
 
         const lp = property.list_price || 0;
@@ -107,8 +110,11 @@ function getMatchingBuyers(property, buyers) {
 }
 
 function getMatchingProperties(buyer, properties) {
-    const buyerZips = (buyer.zip_codes || '').split(',').map(z => z.trim()).filter(Boolean);
-    const buyerTypes = (buyer.property_types || '').split(',').map(t => t.trim()).filter(Boolean);
+    // Skip matching if buyer criteria are incomplete
+    if (!buyer.zip_codes || !buyer.property_types || !buyer.condition_tolerance) return [];
+
+    const buyerZips = buyer.zip_codes.split(',').map(z => z.trim()).filter(Boolean);
+    const buyerTypes = buyer.property_types.split(',').map(t => t.trim()).filter(Boolean);
     const buyerTol = CONDITION_RANK[buyer.condition_tolerance] || 99;
     const matches = [];
 
@@ -205,3 +211,81 @@ window.signOut = async () => {
     await db.auth.signOut();
     showLogin();
 };
+
+// ── Sortable Tables ─────────────────────────────────────────────────────────
+// Tracks current sort state per table id
+const _sortState = {};
+
+function makeSortable(tableId) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(th => {
+        th.style.cursor = 'pointer';
+        th.style.userSelect = 'none';
+        th.addEventListener('click', () => sortTable(tableId, th.dataset.sort, th.dataset.type || 'string'));
+    });
+    // Show initial indicator
+    updateSortIndicators(tableId);
+}
+
+function sortTable(tableId, col, type) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const tbody = table.querySelector('tbody') || table;
+    const rows = Array.from(tbody.querySelectorAll('tr[data-row]'));
+    if (!rows.length) return;
+
+    // Toggle direction
+    const state = _sortState[tableId] || {};
+    if (state.col === col) {
+        state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.col = col;
+        state.dir = 'asc';
+    }
+    _sortState[tableId] = state;
+
+    rows.sort((a, b) => {
+        let va = a.dataset['sort' + col] ?? '';
+        let vb = b.dataset['sort' + col] ?? '';
+
+        if (type === 'number') {
+            va = parseFloat(va) || 0;
+            vb = parseFloat(vb) || 0;
+        } else if (type === 'date') {
+            va = va || '9999';
+            vb = vb || '9999';
+        } else {
+            va = va.toLowerCase();
+            vb = vb.toLowerCase();
+        }
+
+        let result = 0;
+        if (va < vb) result = -1;
+        else if (va > vb) result = 1;
+
+        return state.dir === 'desc' ? -result : result;
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+    updateSortIndicators(tableId);
+}
+
+function updateSortIndicators(tableId) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const state = _sortState[tableId] || {};
+    table.querySelectorAll('th[data-sort]').forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.remove();
+        if (th.dataset.sort === state.col) {
+            const span = document.createElement('span');
+            span.className = 'sort-arrow';
+            span.textContent = state.dir === 'asc' ? ' ▲' : ' ▼';
+            span.style.fontSize = '10px';
+            span.style.opacity = '0.7';
+            th.appendChild(span);
+        }
+    });
+}

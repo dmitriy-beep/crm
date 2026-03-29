@@ -164,9 +164,9 @@ async function renderBuyersList(params) {
       ${batch ? `<button class="btn btn-sm" onclick="renameBatch('buyers','${batch.replace(/'/g,"\\'")}')" style="margin-left:4px;">Rename "${batch}"</button>
       <button class="btn btn-sm btn-danger" onclick="deleteBatch('buyers','${batch.replace(/'/g,"\\'")}')" >Delete Batch</button>` : ''}
     </div>
-    <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>Name</th><th>Status</th><th>Strategy</th><th>Price Range</th><th>Zips</th><th>Condition</th><th>Funding</th><th>POF</th><th>Deals</th><th>Next F/U</th>${batches.length ? '<th>Import</th>' : ''}<th></th></tr>
-      ${filtered.map(b => `<tr>
+    <div class="card" style="padding:0;overflow-x:auto;"><table id="tbl-buyers">
+      <tr><th data-sort="Name">Name</th><th data-sort="Status">Status</th><th data-sort="Strategy">Strategy</th><th data-sort="Price" data-type="number">Price Range</th><th>Zips</th><th data-sort="Condition">Condition</th><th data-sort="Funding">Funding</th><th data-sort="POF">POF</th><th data-sort="Deals" data-type="number">Deals</th><th data-sort="Followup" data-type="date">Next F/U</th>${batches.length ? '<th data-sort="Import">Import</th>' : ''}<th></th></tr>
+      ${filtered.map(b => `<tr data-row data-sortName="${(b.name||'').replace(/"/g,'&quot;')}" data-sortStatus="${b.status||''}" data-sortStrategy="${b.strategy||''}" data-sortPrice="${b.max_price||0}" data-sortCondition="${b.condition_tolerance||''}" data-sortFunding="${b.funding_method||''}" data-sortPOF="${b.proof_of_funds_verified?'1':'0'}" data-sortDeals="${b.deals_last_12_months||0}" data-sortFollowup="${b.next_followup||''}" ${batches.length ? `data-sortImport="${b.import_batch||''}"` : ''}>
         <td><a href="/buyers/${b.id}"><strong>${b.name}</strong></a>${b.entity_name ? `<br><span class="text-muted text-sm">${b.entity_name}</span>` : ''}</td>
         <td>${badge(b.status, buyerStatusColor(b.status))}</td>
         <td>${(b.strategy || '').replace(/_/g,' ')}</td>
@@ -184,6 +184,7 @@ async function renderBuyersList(params) {
     </table></div>`;
 
     window._buyersData = buyers;
+    setTimeout(() => makeSortable('tbl-buyers'), 0);
 }
 
 window.filterBuyers = () => {
@@ -291,9 +292,6 @@ window.confirmPropStreamBuyerImport = async () => {
         email: buyers[i].email,
         source: 'public_records',
         status: 'new',
-        strategy: 'flip',
-        funding_method: 'cash',
-        condition_tolerance: 'full_gut',
         preferred_contact: 'call',
         proof_of_funds_verified: false,
         deals_last_12_months: 0,
@@ -512,12 +510,12 @@ async function renderPropertiesList(params) {
       <button class="btn btn-sm" onclick="filterProps()">Filter</button>
       <a href="/properties" class="btn btn-sm">Clear</a>
     </div>
-    <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>Address</th><th>Price</th><th>MAO</th><th>Spread</th><th>DOM</th><th>Beds/Ba</th><th>Sqft</th><th>Type</th><th>Cond</th><th>ADU</th><th>Status</th><th>Matches</th><th></th></tr>
+    <div class="card" style="padding:0;overflow-x:auto;"><table id="tbl-properties">
+      <tr><th data-sort="Address">Address</th><th data-sort="Price" data-type="number">Price</th><th data-sort="MAO" data-type="number">MAO</th><th data-sort="Spread" data-type="number">Spread</th><th data-sort="DOM" data-type="number">DOM</th><th data-sort="Beds" data-type="number">Beds/Ba</th><th data-sort="Sqft" data-type="number">Sqft</th><th data-sort="Type">Type</th><th data-sort="Cond">Cond</th><th>ADU</th><th data-sort="Status">Status</th><th data-sort="Matches" data-type="number">Matches</th><th></th></tr>
       ${filtered.map(p => {
         const spread = (p.mao||0) - (p.list_price||0);
         const matchCount = getMatchingBuyers(p, allBuyers||[]).length;
-        return `<tr>
+        return `<tr data-row data-sortAddress="${(p.address||'').replace(/"/g,'&quot;')}" data-sortPrice="${p.list_price||0}" data-sortMAO="${p.mao||0}" data-sortSpread="${spread}" data-sortDOM="${p.dom||0}" data-sortBeds="${p.beds||0}" data-sortSqft="${p.sqft||0}" data-sortType="${p.property_type||''}" data-sortCond="${p.condition_estimate||''}" data-sortStatus="${p.status||''}" data-sortMatches="${matchCount}">
           <td><a href="/properties/${p.id}"><strong>${p.address}</strong></a><br><span class="text-muted text-sm">${p.city||''} ${p.zip_code||''}</span></td>
           <td class="money">${fmt(p.list_price)}</td><td class="money">${fmt(p.mao)}</td>
           <td class="money ${spread>=0?'money-green':'money-red'}">${fmt(spread)}</td>
@@ -533,6 +531,8 @@ async function renderPropertiesList(params) {
       }).join('')}
       ${filtered.length===0?'<tr><td colspan="13" class="text-muted" style="text-align:center;padding:24px;">No properties found.</td></tr>':''}
     </table></div>`;
+
+    setTimeout(() => makeSortable('tbl-properties'), 0);
 }
 
 window.filterProps = () => {
@@ -788,9 +788,9 @@ async function renderContactsList(params) {
       ${batch ? `<button class="btn btn-sm" onclick="renameBatch('contacts','${batch.replace(/'/g,"\\'")}')" style="margin-left:4px;">Rename "${batch}"</button>
       <button class="btn btn-sm btn-danger" onclick="deleteBatch('contacts','${batch.replace(/'/g,"\\'")}')" >Delete Batch</button>` : ''}
     </div>
-    <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>Name</th><th>Role</th><th>Company</th><th>Phone</th><th>Email</th><th>Next F/U</th>${batches.length ? '<th>Import</th>' : ''}<th></th></tr>
-      ${filtered.map(c => `<tr>
+    <div class="card" style="padding:0;overflow-x:auto;"><table id="tbl-contacts">
+      <tr><th data-sort="Name">Name</th><th data-sort="Role">Role</th><th data-sort="Company">Company</th><th>Phone</th><th>Email</th><th data-sort="Followup" data-type="date">Next F/U</th>${batches.length ? '<th data-sort="Import">Import</th>' : ''}<th></th></tr>
+      ${filtered.map(c => `<tr data-row data-sortName="${(c.name||'').replace(/"/g,'&quot;')}" data-sortRole="${c.role||''}" data-sortCompany="${(c.company||'').replace(/"/g,'&quot;')}" data-sortFollowup="${c.next_followup||''}" ${batches.length ? `data-sortImport="${c.import_batch||''}"` : ''}>
         <td><a href="/contacts/${c.id}"><strong>${c.name}</strong></a></td>
         <td>${badge(c.role,'orange')}</td><td>${c.company||'—'}</td>
         <td>${c.phone||'—'}</td><td>${c.email||'—'}</td>
@@ -800,6 +800,8 @@ async function renderContactsList(params) {
       </tr>`).join('')}
       ${filtered.length===0?`<tr><td colspan="${batches.length ? 8 : 7}" class="text-muted" style="text-align:center;padding:24px;">No contacts.</td></tr>`:''}
     </table></div>`;
+
+    setTimeout(() => makeSortable('tbl-contacts'), 0);
 }
 
 window.filterContacts = () => {
@@ -1163,13 +1165,13 @@ async function renderActivitiesList(params) {
       <button class="btn btn-sm" onclick="filterActs()">Filter</button>
       <a href="/activities" class="btn btn-sm">Clear</a>
     </div>
-    <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>When</th><th>Type</th><th>Who</th><th>Activity</th><th>Description</th><th>Follow-up</th></tr>
+    <div class="card" style="padding:0;overflow-x:auto;"><table id="tbl-activities">
+      <tr><th data-sort="When" data-type="date">When</th><th data-sort="Type">Type</th><th data-sort="Who">Who</th><th data-sort="Activity">Activity</th><th>Description</th><th data-sort="Followup" data-type="date">Follow-up</th></tr>
       ${filtered.map(a => {
         let name = '', url = '#';
         if (a.contact_type==='buyer') { name = bMap[a.contact_id]||''; url = `/buyers/${a.contact_id}`; }
         else { name = cMap[a.contact_id]||''; url = `/contacts/${a.contact_id}`; }
-        return `<tr>
+        return `<tr data-row data-sortWhen="${(a.created_at||'').slice(0,16)}" data-sortType="${a.contact_type||''}" data-sortWho="${(name||'').replace(/"/g,'&quot;')}" data-sortActivity="${a.activity_type||''}" data-sortFollowup="${a.followup_date||''}">
           <td class="text-sm text-muted" style="white-space:nowrap;">${(a.created_at||'').slice(0,16)}</td>
           <td>${badge(a.contact_type,'gray')}</td>
           <td>${name?`<a href="${url}">${name}</a>`:'—'}</td>
@@ -1180,6 +1182,8 @@ async function renderActivitiesList(params) {
       }).join('')}
       ${filtered.length===0?'<tr><td colspan="6" class="text-muted" style="text-align:center;padding:24px;">No activities.</td></tr>':''}
     </table></div>`;
+
+    setTimeout(() => makeSortable('tbl-activities'), 0);
 }
 
 window.filterActs = () => {

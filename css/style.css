@@ -39,6 +39,8 @@ a:hover { text-decoration:underline; }
 
 table { width:100%; border-collapse:collapse; font-size:13px; }
 th { text-align:left; padding:8px 12px; border-bottom:2px solid var(--border); color:var(--text2); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+th[data-sort] { cursor:pointer; user-select:none; transition:color .15s; }
+th[data-sort]:hover { color:var(--text); }
 td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
 tr:hover td { background:var(--surface2); }
 
