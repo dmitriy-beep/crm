@@ -128,11 +128,16 @@ async function renderBuyersList(params) {
     const status = params?.get('status');
     const strategy = params?.get('strategy');
     const zip = params?.get('zip');
+    const batch = params?.get('batch');
 
     if (search) filtered = filtered.filter(b => (b.name + ' ' + b.email).toLowerCase().includes(search.toLowerCase()));
     if (status) filtered = filtered.filter(b => b.status === status);
     if (strategy) filtered = filtered.filter(b => b.strategy === strategy);
     if (zip) filtered = filtered.filter(b => (b.zip_codes || '').includes(zip));
+    if (batch) filtered = filtered.filter(b => b.import_batch === batch);
+
+    // Get unique batch names for filter dropdown
+    const batches = [...new Set((buyers || []).map(b => b.import_batch).filter(Boolean))].sort();
 
     // Sort by status priority
     const so = { verified_active: 0, engaged: 1, criteria_collected: 2, contacted: 3, new: 4, inactive: 5 };
@@ -153,11 +158,14 @@ async function renderBuyersList(params) {
       <select id="f-status"><option value="">All Status</option>${['new','contacted','criteria_collected','engaged','verified_active','inactive'].map(s => `<option value="${s}" ${status===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
       <select id="f-strategy"><option value="">All Strategies</option>${['flip','brrrr','rental_hold','wholesale'].map(s => `<option value="${s}" ${strategy===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
       <input type="text" id="f-zip" placeholder="Zip" value="${zip || ''}" style="width:100px;">
+      ${batches.length ? `<select id="f-batch"><option value="">All Imports</option>${batches.map(b => `<option value="${b}" ${batch===b?'selected':''}>${b}</option>`).join('')}</select>` : ''}
       <button class="btn btn-sm" onclick="filterBuyers()">Filter</button>
       <a href="/buyers" class="btn btn-sm">Clear</a>
+      ${batch ? `<button class="btn btn-sm" onclick="renameBatch('buyers','${batch.replace(/'/g,"\\'")}')" style="margin-left:4px;">Rename "${batch}"</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteBatch('buyers','${batch.replace(/'/g,"\\'")}')" >Delete Batch</button>` : ''}
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>Name</th><th>Status</th><th>Strategy</th><th>Price Range</th><th>Zips</th><th>Condition</th><th>Funding</th><th>POF</th><th>Deals</th><th>Next F/U</th><th></th></tr>
+      <tr><th>Name</th><th>Status</th><th>Strategy</th><th>Price Range</th><th>Zips</th><th>Condition</th><th>Funding</th><th>POF</th><th>Deals</th><th>Next F/U</th>${batches.length ? '<th>Import</th>' : ''}<th></th></tr>
       ${filtered.map(b => `<tr>
         <td><a href="/buyers/${b.id}"><strong>${b.name}</strong></a>${b.entity_name ? `<br><span class="text-muted text-sm">${b.entity_name}</span>` : ''}</td>
         <td>${badge(b.status, buyerStatusColor(b.status))}</td>
@@ -169,9 +177,10 @@ async function renderBuyersList(params) {
         <td>${b.proof_of_funds_verified ? badge('✓','green') : badge('–','gray')}</td>
         <td>${b.deals_last_12_months}</td>
         <td class="text-sm">${b.next_followup || ''}</td>
+        ${batches.length ? `<td class="text-sm text-muted">${b.import_batch || ''}</td>` : ''}
         <td style="white-space:nowrap;"><a href="/buyers/${b.id}/edit" class="btn btn-sm">Edit</a> <button class="btn btn-sm btn-danger" onclick="deleteBuyer(${b.id})">Del</button></td>
       </tr>`).join('')}
-      ${filtered.length === 0 ? '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:24px;">No buyers found.</td></tr>' : ''}
+      ${filtered.length === 0 ? `<tr><td colspan="${batches.length ? 12 : 11}" class="text-muted" style="text-align:center;padding:24px;">No buyers found.</td></tr>` : ''}
     </table></div>`;
 
     window._buyersData = buyers;
@@ -183,6 +192,7 @@ window.filterBuyers = () => {
     const st = document.getElementById('f-status').value; if (st) params.set('status', st);
     const str = document.getElementById('f-strategy').value; if (str) params.set('strategy', str);
     const z = document.getElementById('f-zip').value; if (z) params.set('zip', z);
+    const b = document.getElementById('f-batch')?.value; if (b) params.set('batch', b);
     navigate('/buyers' + (params.toString() ? '?' + params.toString() : ''));
 };
 
@@ -195,17 +205,18 @@ window.exportBuyers = async () => {
 window.handlePropStreamBuyerImport = (input) => {
     const file = input.files[0];
     if (!file) return;
+    const batchName = file.name.replace(/\.csv$/i, '');
     const reader = new FileReader();
     reader.onload = (e) => {
         const rows = parsePropStreamCSV(e.target.result);
         if (!rows.length) { flash('No data found in CSV', 'error'); return; }
-        showPropStreamBuyerPreview(rows);
+        showPropStreamBuyerPreview(rows, batchName);
     };
     reader.readAsText(file);
     input.value = '';
 };
 
-function showPropStreamBuyerPreview(owners) {
+function showPropStreamBuyerPreview(owners, batchName) {
     const buyers = owners.map(o => {
         const noteParts = [];
         if (o.firstName || o.lastName) noteParts.push(`Contact: ${[o.firstName, o.lastName].filter(Boolean).join(' ')}`);
@@ -237,7 +248,8 @@ function showPropStreamBuyerPreview(owners) {
         Found <strong style="color:var(--text)">${buyers.length}</strong> unique contacts from CSV.
         Duplicate rows (same name) have been merged.
         Phones marked DNC are excluded from the primary phone and noted separately.
-        All imported buyers will be set to <strong style="color:var(--text)">new</strong> status — edit them after import to fill in criteria (zips, price range, strategy, etc).
+        All imported buyers will be set to <strong style="color:var(--text)">new</strong> status — edit them after import to fill in criteria.
+        <br>Import batch: <strong style="color:var(--accent)">${batchName}</strong> — you can rename this later from the Buyers list filter.
       </div>
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
@@ -253,6 +265,7 @@ function showPropStreamBuyerPreview(owners) {
     </table></div>`;
 
     window._propStreamBuyers = buyers;
+    window._propStreamBuyerBatch = batchName;
 }
 
 window.toggleAllPropStreamBuyer = (checked) => {
@@ -261,6 +274,7 @@ window.toggleAllPropStreamBuyer = (checked) => {
 
 window.confirmPropStreamBuyerImport = async () => {
     const buyers = window._propStreamBuyers;
+    const batchName = window._propStreamBuyerBatch || 'import';
     if (!buyers) return;
 
     const selected = [];
@@ -284,6 +298,7 @@ window.confirmPropStreamBuyerImport = async () => {
         proof_of_funds_verified: false,
         deals_last_12_months: 0,
         notes: buyers[i].notes,
+        import_batch: batchName,
     }));
 
     let inserted = 0;
@@ -297,8 +312,8 @@ window.confirmPropStreamBuyerImport = async () => {
     }
 
     if (errors) flash(`Imported ${inserted} buyers (${errors} chunk(s) had errors)`, 'error');
-    else flash(`Imported ${inserted} buyers from PropStream`);
-    navigate('/buyers');
+    else flash(`Imported ${inserted} buyers from PropStream → "${batchName}"`);
+    navigate('/buyers?batch=' + encodeURIComponent(batchName));
 };
 
 // ── Buyer Form ──────────────────────────────────────────────────────────────
@@ -747,8 +762,12 @@ async function renderContactsList(params) {
     let filtered = contacts || [];
     const search = params?.get('search');
     const role = params?.get('role');
+    const batch = params?.get('batch');
     if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
     if (role) filtered = filtered.filter(c => c.role === role);
+    if (batch) filtered = filtered.filter(c => c.import_batch === batch);
+
+    const batches = [...new Set((contacts || []).map(c => c.import_batch).filter(Boolean))].sort();
 
     app.innerHTML = `
     <div class="flex justify-between items-center mb-2">
@@ -763,19 +782,23 @@ async function renderContactsList(params) {
     <div class="filters">
       <input type="text" id="fc-search" placeholder="Search name…" value="${search||''}">
       <select id="fc-role"><option value="">All Roles</option>${['listing_agent','contractor','attorney','property_manager','title_company','other'].map(s=>`<option value="${s}" ${role===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
+      ${batches.length ? `<select id="fc-batch"><option value="">All Imports</option>${batches.map(b => `<option value="${b}" ${batch===b?'selected':''}>${b}</option>`).join('')}</select>` : ''}
       <button class="btn btn-sm" onclick="filterContacts()">Filter</button>
       <a href="/contacts" class="btn btn-sm">Clear</a>
+      ${batch ? `<button class="btn btn-sm" onclick="renameBatch('contacts','${batch.replace(/'/g,"\\'")}')" style="margin-left:4px;">Rename "${batch}"</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteBatch('contacts','${batch.replace(/'/g,"\\'")}')" >Delete Batch</button>` : ''}
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th>Name</th><th>Role</th><th>Company</th><th>Phone</th><th>Email</th><th>Next F/U</th><th></th></tr>
+      <tr><th>Name</th><th>Role</th><th>Company</th><th>Phone</th><th>Email</th><th>Next F/U</th>${batches.length ? '<th>Import</th>' : ''}<th></th></tr>
       ${filtered.map(c => `<tr>
         <td><a href="/contacts/${c.id}"><strong>${c.name}</strong></a></td>
         <td>${badge(c.role,'orange')}</td><td>${c.company||'—'}</td>
         <td>${c.phone||'—'}</td><td>${c.email||'—'}</td>
         <td>${c.next_followup||'—'}</td>
+        ${batches.length ? `<td class="text-sm text-muted">${c.import_batch || ''}</td>` : ''}
         <td style="white-space:nowrap;"><a href="/contacts/${c.id}/edit" class="btn btn-sm">Edit</a> <button class="btn btn-sm btn-danger" onclick="deleteContact(${c.id})">Del</button></td>
       </tr>`).join('')}
-      ${filtered.length===0?'<tr><td colspan="7" class="text-muted" style="text-align:center;padding:24px;">No contacts.</td></tr>':''}
+      ${filtered.length===0?`<tr><td colspan="${batches.length ? 8 : 7}" class="text-muted" style="text-align:center;padding:24px;">No contacts.</td></tr>`:''}
     </table></div>`;
 }
 
@@ -783,6 +806,7 @@ window.filterContacts = () => {
     const params = new URLSearchParams();
     if (document.getElementById('fc-search').value) params.set('search', document.getElementById('fc-search').value);
     if (document.getElementById('fc-role').value) params.set('role', document.getElementById('fc-role').value);
+    const b = document.getElementById('fc-batch')?.value; if (b) params.set('batch', b);
     navigate('/contacts' + (params.toString() ? '?' + params : ''));
 };
 window.exportContacts = async () => {
@@ -794,14 +818,15 @@ window.exportContacts = async () => {
 window.handlePropStreamImport = (input) => {
     const file = input.files[0];
     if (!file) return;
+    const batchName = file.name.replace(/\.csv$/i, '');
     const reader = new FileReader();
     reader.onload = (e) => {
         const rows = parsePropStreamCSV(e.target.result);
         if (!rows.length) { flash('No data found in CSV', 'error'); return; }
-        showPropStreamPreview(rows);
+        showPropStreamPreview(rows, batchName);
     };
     reader.readAsText(file);
-    input.value = ''; // reset so same file can be re-selected
+    input.value = '';
 };
 
 function parsePropStreamCSV(text) {
@@ -908,7 +933,7 @@ function parsePropStreamCSV(text) {
     return Array.from(ownerMap.values());
 }
 
-function showPropStreamPreview(owners) {
+function showPropStreamPreview(owners, batchName) {
     // Build notes for each contact
     const contacts = owners.map(o => {
         const noteParts = [];
@@ -942,6 +967,7 @@ function showPropStreamPreview(owners) {
         Found <strong style="color:var(--text)">${contacts.length}</strong> unique contacts from CSV.
         Duplicate rows (same name) have been merged.
         Phones marked DNC are excluded from the primary phone and noted separately.
+        <br>Import batch: <strong style="color:var(--accent)">${batchName}</strong> — you can rename this later from the Contacts list filter.
       </div>
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
@@ -956,6 +982,7 @@ function showPropStreamPreview(owners) {
     </table></div>`;
 
     window._propStreamContacts = contacts;
+    window._propStreamContactBatch = batchName;
 }
 
 window.toggleAllPropStream = (checked) => {
@@ -964,6 +991,7 @@ window.toggleAllPropStream = (checked) => {
 
 window.confirmPropStreamImport = async () => {
     const contacts = window._propStreamContacts;
+    const batchName = window._propStreamContactBatch || 'import';
     if (!contacts) return;
 
     // Get selected indices
@@ -981,6 +1009,7 @@ window.confirmPropStreamImport = async () => {
         role: contacts[i].role,
         company: contacts[i].company,
         notes: contacts[i].notes,
+        import_batch: batchName,
     }));
 
     // Batch insert in chunks of 50
@@ -995,8 +1024,34 @@ window.confirmPropStreamImport = async () => {
     }
 
     if (errors) flash(`Imported ${inserted} contacts (${errors} chunk(s) had errors)`, 'error');
-    else flash(`Imported ${inserted} contacts from PropStream`);
-    navigate('/contacts');
+    else flash(`Imported ${inserted} contacts from PropStream → "${batchName}"`);
+    navigate('/contacts?batch=' + encodeURIComponent(batchName));
+};
+
+// ── Batch Management (shared by buyers + contacts) ──────────────────────────
+window.renameBatch = async (table, oldName) => {
+    const newName = prompt(`Rename import batch "${oldName}" to:`, oldName);
+    if (!newName || newName === oldName) return;
+    const { error } = await db.from(table).update({ import_batch: newName }).eq('import_batch', oldName);
+    if (error) { flash(error.message, 'error'); return; }
+    flash(`Renamed "${oldName}" → "${newName}"`);
+    navigate(`/${table}?batch=${encodeURIComponent(newName)}`);
+};
+
+window.deleteBatch = async (table, batchName) => {
+    const { data } = await db.from(table).select('id').eq('import_batch', batchName);
+    const count = (data || []).length;
+    if (!confirm(`Delete all ${count} records in batch "${batchName}"? This cannot be undone.`)) return;
+    if (table === 'buyers') {
+        // Also delete related activity logs
+        for (const row of (data || [])) {
+            await db.from('activity_log').delete().eq('contact_type', 'buyer').eq('contact_id', row.id);
+        }
+    }
+    const { error } = await db.from(table).delete().eq('import_batch', batchName);
+    if (error) { flash(error.message, 'error'); return; }
+    flash(`Deleted ${count} records from batch "${batchName}"`);
+    navigate(`/${table}`);
 };
 
 // ── Contact Form ────────────────────────────────────────────────────────────
