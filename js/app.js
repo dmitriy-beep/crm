@@ -643,6 +643,8 @@ async function renderContactsList(params) {
       <h1 style="font-size:20px;font-weight:700;">Contacts</h1>
       <div class="flex gap-2">
         <button class="btn btn-sm" onclick="exportContacts()">Export CSV</button>
+        <button class="btn btn-sm" onclick="document.getElementById('propstream-file').click()" style="background:var(--orange);border-color:var(--orange);color:#fff;">Import PropStream</button>
+        <input type="file" id="propstream-file" accept=".csv" style="display:none" onchange="handlePropStreamImport(this)">
         <a href="/contacts/new" class="btn btn-sm btn-primary">+ Add Contact</a>
       </div>
     </div>
@@ -674,6 +676,226 @@ window.filterContacts = () => {
 window.exportContacts = async () => {
     const { data } = await db.from('contacts').select('*');
     if (data) exportCSV(data, 'contacts.csv');
+};
+
+// ── PropStream CSV Import ───────────────────────────────────────────────────
+window.handlePropStreamImport = (input) => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const rows = parsePropStreamCSV(e.target.result);
+        if (!rows.length) { flash('No data found in CSV', 'error'); return; }
+        showPropStreamPreview(rows);
+    };
+    reader.readAsText(file);
+    input.value = ''; // reset so same file can be re-selected
+};
+
+function parsePropStreamCSV(text) {
+    // Parse CSV respecting quoted fields
+    const lines = [];
+    let current = '';
+    let inQuote = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '"') {
+            if (inQuote && text[i + 1] === '"') { current += '"'; i++; }
+            else inQuote = !inQuote;
+        } else if ((ch === '\n' || ch === '\r') && !inQuote) {
+            if (current.length > 0) lines.push(current);
+            current = '';
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+        } else {
+            current += ch;
+        }
+    }
+    if (current.length > 0) lines.push(current);
+
+    if (lines.length < 2) return [];
+
+    // Split each line into fields
+    function splitRow(line) {
+        const fields = [];
+        let field = '';
+        let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') {
+                if (inQ && line[i + 1] === '"') { field += '"'; i++; }
+                else inQ = !inQ;
+            } else if (ch === ',' && !inQ) {
+                fields.push(field);
+                field = '';
+            } else {
+                field += ch;
+            }
+        }
+        fields.push(field);
+        return fields;
+    }
+
+    const headers = splitRow(lines[0]).map(h => h.trim());
+    const col = (name) => headers.indexOf(name);
+
+    // Group by owner (Company Name) to deduplicate and aggregate properties
+    const ownerMap = new Map();
+
+    for (let i = 1; i < lines.length; i++) {
+        const f = splitRow(lines[i]);
+        const get = (name) => (f[col(name)] || '').trim();
+
+        const companyName = get('Company Name');
+        const firstName = get('First Name');
+        const lastName = get('Last Name');
+        const name = companyName || [firstName, lastName].filter(Boolean).join(' ');
+        if (!name) continue;
+
+        const address = get('Street Address');
+        const city = get('City');
+        const state = get('State');
+        const zip = get('Zip');
+        const propLine = [address, city, state, zip].filter(Boolean).join(', ');
+
+        const mailAddr = [get('Mail Street Address'), get('Mail City'), get('Mail State'), get('Mail Zip')].filter(Boolean).join(', ');
+
+        // Collect all phones (non-empty, skip DNC)
+        const phones = [];
+        for (let p = 1; p <= 5; p++) {
+            const num = get(`Phone ${p}`);
+            const dnc = get(`Phone ${p} DNC`);
+            if (num && !dnc.includes('DNC')) phones.push(num);
+        }
+        // Also collect DNC phones separately for notes
+        const dncPhones = [];
+        for (let p = 1; p <= 5; p++) {
+            const num = get(`Phone ${p}`);
+            const dnc = get(`Phone ${p} DNC`);
+            if (num && dnc.includes('DNC')) dncPhones.push(num);
+        }
+
+        // Collect emails
+        const emails = [];
+        for (let e = 1; e <= 4; e++) {
+            const em = get(`Email ${e}`);
+            if (em) emails.push(em);
+        }
+
+        const key = name.toLowerCase();
+        if (!ownerMap.has(key)) {
+            ownerMap.set(key, {
+                name,
+                firstName, lastName,
+                phones: [], dncPhones: [],
+                emails: [],
+                properties: [],
+                mailAddr: mailAddr || null,
+                type: get('Type'),
+                status: get('Status'),
+            });
+        }
+        const owner = ownerMap.get(key);
+        if (propLine && !owner.properties.includes(propLine)) owner.properties.push(propLine);
+        phones.forEach(p => { if (!owner.phones.includes(p)) owner.phones.push(p); });
+        dncPhones.forEach(p => { if (!owner.dncPhones.includes(p)) owner.dncPhones.push(p); });
+        emails.forEach(e => { if (!owner.emails.includes(e)) owner.emails.push(e); });
+    }
+
+    return Array.from(ownerMap.values());
+}
+
+function showPropStreamPreview(owners) {
+    // Build notes for each contact
+    const contacts = owners.map(o => {
+        const noteParts = [];
+        if (o.firstName || o.lastName) noteParts.push(`Contact: ${[o.firstName, o.lastName].filter(Boolean).join(' ')}`);
+        if (o.properties.length) noteParts.push(`Properties (${o.properties.length}):\n${o.properties.join('\n')}`);
+        if (o.mailAddr) noteParts.push(`Mail: ${o.mailAddr}`);
+        if (o.emails.length > 1) noteParts.push(`Other emails: ${o.emails.slice(1).join(', ')}`);
+        if (o.dncPhones.length) noteParts.push(`DNC phones: ${o.dncPhones.join(', ')}`);
+        if (o.phones.length > 1) noteParts.push(`Other phones: ${o.phones.slice(1).join(', ')}`);
+        noteParts.push(`PropStream type: ${o.type || '—'}`);
+
+        return {
+            name: o.name,
+            phone: o.phones[0] || null,
+            email: o.emails[0] || null,
+            role: 'other',
+            company: null,
+            notes: noteParts.join('\n'),
+            propCount: o.properties.length,
+        };
+    });
+
+    app.innerHTML = `
+    <div class="flex justify-between items-center mb-2">
+      <h1 style="font-size:20px;font-weight:700;">Import PropStream Contacts</h1>
+      <div class="flex gap-2">
+        <button class="btn btn-primary" onclick="confirmPropStreamImport()">Import ${contacts.length} Contacts</button>
+        <a href="/contacts" class="btn">Cancel</a>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div class="text-sm text-muted">
+        Found <strong style="color:var(--text)">${contacts.length}</strong> unique owners from CSV.
+        Duplicate owners (same company name across multiple properties) have been merged — all property addresses are listed in the notes field.
+        Phones marked DNC are excluded from the primary phone and noted separately.
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto;"><table>
+      <tr><th style="width:30px;"><input type="checkbox" id="ps-check-all" checked onchange="toggleAllPropStream(this.checked)"></th><th>Name</th><th>Phone</th><th>Email</th><th>Properties</th><th>Notes Preview</th></tr>
+      ${contacts.map((c, i) => `<tr>
+        <td><input type="checkbox" class="ps-row-check" data-idx="${i}" checked></td>
+        <td><strong>${c.name}</strong></td>
+        <td>${c.phone || '—'}</td>
+        <td>${c.email || '—'}</td>
+        <td>${badge(c.propCount, 'blue')}</td>
+        <td class="text-sm text-muted" style="max-width:300px;white-space:pre-wrap;">${(c.notes || '').slice(0, 120)}${c.notes.length > 120 ? '…' : ''}</td>
+      </tr>`).join('')}
+    </table></div>`;
+
+    window._propStreamContacts = contacts;
+}
+
+window.toggleAllPropStream = (checked) => {
+    document.querySelectorAll('.ps-row-check').forEach(cb => cb.checked = checked);
+};
+
+window.confirmPropStreamImport = async () => {
+    const contacts = window._propStreamContacts;
+    if (!contacts) return;
+
+    // Get selected indices
+    const selected = [];
+    document.querySelectorAll('.ps-row-check:checked').forEach(cb => {
+        selected.push(parseInt(cb.dataset.idx));
+    });
+
+    if (selected.length === 0) { flash('No contacts selected', 'error'); return; }
+
+    const toInsert = selected.map(i => ({
+        name: contacts[i].name,
+        phone: contacts[i].phone,
+        email: contacts[i].email,
+        role: contacts[i].role,
+        company: contacts[i].company,
+        notes: contacts[i].notes,
+    }));
+
+    // Batch insert in chunks of 50
+    let inserted = 0;
+    let errors = 0;
+    const chunkSize = 50;
+    for (let i = 0; i < toInsert.length; i += chunkSize) {
+        const chunk = toInsert.slice(i, i + chunkSize);
+        const { error } = await db.from('contacts').insert(chunk);
+        if (error) { errors++; console.error('Import chunk error:', error); }
+        else inserted += chunk.length;
+    }
+
+    if (errors) flash(`Imported ${inserted} contacts (${errors} chunk(s) had errors)`, 'error');
+    else flash(`Imported ${inserted} contacts from PropStream`);
+    navigate('/contacts');
 };
 
 // ── Contact Form ────────────────────────────────────────────────────────────
