@@ -221,6 +221,7 @@ function showPropStreamBuyerPreview(owners, batchName) {
     const buyers = owners.map(o => {
         const noteParts = [];
         if (o.firstName || o.lastName) noteParts.push(`Contact: ${[o.firstName, o.lastName].filter(Boolean).join(' ')}`);
+        if (o.addresses.length) noteParts.push(`Property addresses:\n${o.addresses.join('\n')}`);
         if (o.mailAddr) noteParts.push(`Mail: ${o.mailAddr}`);
         if (o.emails.length > 1) noteParts.push(`Other emails: ${o.emails.slice(1).join(', ')}`);
         if (o.dncPhones.length) noteParts.push(`DNC phones: ${o.dncPhones.join(', ')}`);
@@ -890,6 +891,12 @@ function parsePropStreamCSV(text) {
         const name = companyName || [firstName, lastName].filter(Boolean).join(' ');
         if (!name) continue;
 
+        const address = get('Street Address');
+        const city = get('City');
+        const state = get('State');
+        const zip = get('Zip');
+        const propAddr = [address, city, state, zip].filter(Boolean).join(', ');
+
         const mailAddr = [get('Mail Street Address'), get('Mail City'), get('Mail State'), get('Mail Zip')].filter(Boolean).join(', ');
 
         // Collect all phones (non-empty, skip DNC)
@@ -921,12 +928,14 @@ function parsePropStreamCSV(text) {
                 firstName, lastName,
                 phones: [], dncPhones: [],
                 emails: [],
+                addresses: [],
                 mailAddr: mailAddr || null,
                 type: get('Type'),
                 status: get('Status'),
             });
         }
         const owner = ownerMap.get(key);
+        if (propAddr && !owner.addresses.includes(propAddr)) owner.addresses.push(propAddr);
         phones.forEach(p => { if (!owner.phones.includes(p)) owner.phones.push(p); });
         dncPhones.forEach(p => { if (!owner.dncPhones.includes(p)) owner.dncPhones.push(p); });
         emails.forEach(e => { if (!owner.emails.includes(e)) owner.emails.push(e); });
@@ -940,6 +949,7 @@ function showPropStreamPreview(owners, batchName) {
     const contacts = owners.map(o => {
         const noteParts = [];
         if (o.firstName || o.lastName) noteParts.push(`Contact: ${[o.firstName, o.lastName].filter(Boolean).join(' ')}`);
+        if (o.addresses.length) noteParts.push(`Property addresses:\n${o.addresses.join('\n')}`);
         if (o.mailAddr) noteParts.push(`Mail: ${o.mailAddr}`);
         if (o.emails.length > 1) noteParts.push(`Other emails: ${o.emails.slice(1).join(', ')}`);
         if (o.dncPhones.length) noteParts.push(`DNC phones: ${o.dncPhones.join(', ')}`);
