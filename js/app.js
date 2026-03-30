@@ -140,7 +140,7 @@ async function renderBuyersList(params) {
     const batches = [...new Set((buyers || []).map(b => b.import_batch).filter(Boolean))].sort();
 
     // Sort by status priority
-    const so = { verified_active: 0, engaged: 1, criteria_collected: 2, contacted: 3, new: 4, inactive: 5 };
+    const so = { verified_active: 0, engaged: 1, criteria_collected: 2, contacted: 3, new: 4, not_investor: 5, inactive: 6 };
     filtered.sort((a, b) => (so[a.status] || 5) - (so[b.status] || 5));
 
     app.innerHTML = `
@@ -155,7 +155,7 @@ async function renderBuyersList(params) {
     </div>
     <div class="filters">
       <input type="text" id="f-search" placeholder="Search name/email…" value="${search || ''}">
-      <select id="f-status"><option value="">All Status</option>${['new','contacted','criteria_collected','engaged','verified_active','inactive'].map(s => `<option value="${s}" ${status===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
+      <select id="f-status"><option value="">All Status</option>${['new','contacted','criteria_collected','engaged','verified_active','not_investor','inactive'].map(s => `<option value="${s}" ${status===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
       <select id="f-strategy"><option value="">All Strategies</option>${['flip','brrrr','rental_hold','wholesale'].map(s => `<option value="${s}" ${strategy===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
       <input type="text" id="f-zip" placeholder="Zip" value="${zip || ''}" style="width:100px;">
       ${batches.length ? `<select id="f-batch"><option value="">All Imports</option>${batches.map(b => `<option value="${b}" ${batch===b?'selected':''}>${b}</option>`).join('')}</select>` : ''}
@@ -343,7 +343,7 @@ async function renderBuyerForm(id) {
         <div class="form-group"><label>Strategy</label><select name="strategy">${['flip','brrrr','rental_hold','wholesale'].map(s=>`<option value="${s}" ${sel('strategy',s)}>${s === 'brrrr' ? 'BRRRR' : s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Funding Method</label><select name="funding_method">${['cash','hard_money','conventional','private_money'].map(s=>`<option value="${s}" ${sel('funding_method',s)}>${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Deals (12mo)</label><input type="number" name="deals_last_12_months" value="${v('deals_last_12_months') || 0}"></div>
-        <div class="form-group"><label>Status</label><select name="status">${['new','contacted','criteria_collected','engaged','verified_active','inactive'].map(s=>`<option value="${s}" ${sel('status',s)}>${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Status</label><select name="status">${['new','contacted','criteria_collected','engaged','verified_active','not_investor','inactive'].map(s=>`<option value="${s}" ${sel('status',s)}>${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Next Follow-up</label><input type="date" name="next_followup" value="${v('next_followup')}"></div>
         <div class="form-group"><label>Last Contacted</label><input type="date" name="last_contacted" value="${v('last_contacted')}"></div>
         <div class="form-group"><label style="display:inline-flex;align-items:center;gap:6px;text-transform:none;font-size:13px;"><input type="checkbox" name="proof_of_funds_verified" ${chk('proof_of_funds_verified')}> Proof of Funds Verified</label></div>
@@ -1196,15 +1196,44 @@ window.filterActs = () => {
 // ── Activity Form ───────────────────────────────────────────────────────────
 async function renderActivityForm(params) {
     const [{ data: buyers }, { data: contacts }] = await Promise.all([
-        db.from('buyers').select('id,name').order('name'),
+        db.from('buyers').select('*').order('name'),
         db.from('contacts').select('id,name,role').order('name')
     ]);
 
     const preType = params?.get('contact_type') || '';
     const preId = params?.get('contact_id') || '';
 
+    // Find the pre-selected buyer if applicable
+    let preBuyer = null;
+    if (preType === 'buyer' && preId) {
+        preBuyer = (buyers || []).find(b => String(b.id) === preId);
+    }
+
+    const showQuickActions = preBuyer && ['new', 'contacted'].includes(preBuyer.status);
+
     app.innerHTML = `
     <h1 style="font-size:20px;font-weight:700;margin-bottom:16px;">Log Activity</h1>
+
+    ${showQuickActions ? `
+    <div class="card" style="margin-bottom:16px;">
+      <h2>Quick Actions for ${preBuyer.name} ${badge(preBuyer.status, buyerStatusColor(preBuyer.status))}</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        <button class="btn" onclick="quickAction('no_answer')" style="background:rgba(251,191,36,.15);border-color:var(--yellow);color:var(--yellow);">
+          📵 Couldn't Reach — follow up 1 week
+        </button>
+        <button class="btn" onclick="quickAction('reached_investor')" style="background:rgba(52,211,153,.15);border-color:var(--green);color:var(--green);">
+          ✅ Reached — Investor (fill criteria)
+        </button>
+        <button class="btn" onclick="quickAction('not_investor')" style="background:rgba(251,146,60,.15);border-color:var(--orange);color:var(--orange);">
+          🚫 Reached — Not an Investor (marketing list)
+        </button>
+        <button class="btn" onclick="quickAction('wrong_number')" style="background:rgba(248,113,113,.15);border-color:var(--red);color:var(--red);">
+          ❌ Wrong Number / Bad Contact
+        </button>
+      </div>
+    </div>
+    ` : ''}
+
     <form class="card" id="actForm">
       <div class="form-grid">
         <div class="form-group"><label>Contact Type *</label>
@@ -1217,25 +1246,100 @@ async function renderActivityForm(params) {
           </select>
         </div>
         <div class="form-group"><label>Contact *</label><select name="contact_id" id="act_cid" required><option value="">Select type first…</option></select></div>
-        <div class="form-group"><label>Activity Type *</label><select name="activity_type">${['call','text','email','meeting','offer_submitted','offer_accepted','offer_rejected','note'].map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
-        <div class="form-group"><label>Follow-up Date</label><input type="date" name="followup_date"></div>
-        <div class="form-group full"><label>Description *</label><textarea name="description" required placeholder="What happened?"></textarea></div>
-        <div class="form-group"><label style="display:inline-flex;align-items:center;gap:6px;text-transform:none;font-size:13px;"><input type="checkbox" name="followup_needed"> Follow-up Needed</label></div>
+        <div class="form-group"><label>Activity Type *</label><select name="activity_type" id="act_atype">${['call','text','email','meeting','offer_submitted','offer_accepted','offer_rejected','note'].map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Follow-up Date</label><input type="date" name="followup_date" id="act_fdate"></div>
+        <div class="form-group full"><label>Description *</label><textarea name="description" id="act_desc" required placeholder="What happened?"></textarea></div>
+        <div class="form-group"><label style="display:inline-flex;align-items:center;gap:6px;text-transform:none;font-size:13px;"><input type="checkbox" name="followup_needed" id="act_fchk"> Follow-up Needed</label></div>
+        <div class="form-group"><label>Update Buyer Status</label>
+          <select name="new_status" id="act_new_status">
+            <option value="">— No change —</option>
+            ${['new','contacted','criteria_collected','engaged','verified_active','not_investor','inactive'].map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}
+          </select>
+        </div>
       </div>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save</button>
         <button type="button" class="btn" onclick="saveActivity('save_add')">Save & Log Another</button>
-        <a href="/activities" class="btn">Cancel</a>
+        <a href="${preType === 'buyer' && preId ? '/buyers/' + preId : '/activities'}" class="btn">Cancel</a>
       </div>
-    </form>`;
+    </form>
+
+    ${showQuickActions && preBuyer.status === 'new' ? `
+    <div id="criteria-panel" class="card" style="display:none;margin-top:16px;">
+      <h2>Fill Buyer Criteria — ${preBuyer.name}</h2>
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="form-group full"><label>Target Zip Codes (comma-separated)</label><input type="text" id="qc_zips" value="${preBuyer.zip_codes||''}" placeholder="95747,95678,95677"></div>
+        <div class="form-group"><label>Min Price ($)</label><input type="number" id="qc_min_price" value="${preBuyer.min_price||''}"></div>
+        <div class="form-group"><label>Max Price ($)</label><input type="number" id="qc_max_price" value="${preBuyer.max_price||''}"></div>
+        <div class="form-group"><label>Property Types (comma-separated)</label><input type="text" id="qc_ptypes" value="${preBuyer.property_types||''}" placeholder="sfr,multi,land,condo"></div>
+        <div class="form-group"><label>Condition Tolerance</label><select id="qc_condition">${['','turnkey','cosmetic','medium_rehab','full_gut'].map(s=>`<option value="${s}">${s ? s.replace(/_/g,' ') : '— select —'}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Strategy</label><select id="qc_strategy">${['','flip','brrrr','rental_hold','wholesale'].map(s=>`<option value="${s}">${s === 'brrrr' ? 'BRRRR' : (s ? s.replace(/_/g,' ') : '— select —')}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Funding Method</label><select id="qc_funding">${['','cash','hard_money','conventional','private_money'].map(s=>`<option value="${s}">${s ? s.replace(/_/g,' ') : '— select —'}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Deals (12mo)</label><input type="number" id="qc_deals" value="${preBuyer.deals_last_12_months||0}"></div>
+      </div>
+    </div>
+    ` : ''}
+    `;
 
     window._actBuyers = buyers || [];
     window._actContacts = contacts || [];
     window._actPreId = preId;
+    window._actPreBuyer = preBuyer;
 
     if (preType) updateActContacts();
     document.getElementById('actForm').addEventListener('submit', e => { e.preventDefault(); saveActivity('save'); });
 }
+
+window.quickAction = (action) => {
+    const desc = document.getElementById('act_desc');
+    const fchk = document.getElementById('act_fchk');
+    const fdate = document.getElementById('act_fdate');
+    const atype = document.getElementById('act_atype');
+    const newStatus = document.getElementById('act_new_status');
+    const criteriaPanel = document.getElementById('criteria-panel');
+
+    // Calculate dates
+    const todayDate = new Date();
+    const oneWeek = new Date(todayDate.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+
+    if (action === 'no_answer') {
+        atype.value = 'call';
+        desc.value = 'Called — no answer / voicemail left.';
+        fchk.checked = true;
+        fdate.value = oneWeek;
+        newStatus.value = 'contacted';
+        if (criteriaPanel) criteriaPanel.style.display = 'none';
+    }
+    else if (action === 'reached_investor') {
+        atype.value = 'call';
+        desc.value = 'Reached — confirmed investor. Collecting criteria.';
+        fchk.checked = false;
+        fdate.value = '';
+        newStatus.value = 'criteria_collected';
+        if (criteriaPanel) criteriaPanel.style.display = 'block';
+        desc.focus();
+    }
+    else if (action === 'not_investor') {
+        atype.value = 'call';
+        desc.value = 'Reached — not an active investor. Moved to marketing list.';
+        fchk.checked = false;
+        fdate.value = '';
+        newStatus.value = 'not_investor';
+        if (criteriaPanel) criteriaPanel.style.display = 'none';
+        desc.focus();
+    }
+    else if (action === 'wrong_number') {
+        atype.value = 'call';
+        desc.value = 'Wrong number / disconnected / bad contact info.';
+        fchk.checked = false;
+        fdate.value = '';
+        newStatus.value = 'inactive';
+        if (criteriaPanel) criteriaPanel.style.display = 'none';
+    }
+
+    // Scroll to form
+    document.getElementById('actForm').scrollIntoView({ behavior: 'smooth' });
+};
 
 window.updateActContacts = () => {
     const type = document.getElementById('act_ct').value;
@@ -1273,6 +1377,33 @@ window.saveActivity = async (action) => {
     if (data.contact_type === 'buyer') {
         const upd = { last_contacted: todayStr };
         if (data.followup_needed && data.followup_date) upd.next_followup = data.followup_date;
+
+        // Update buyer status if selected
+        const newStatus = document.getElementById('act_new_status')?.value;
+        if (newStatus) upd.status = newStatus;
+
+        // Save criteria if the panel is visible and filled
+        const criteriaPanel = document.getElementById('criteria-panel');
+        if (criteriaPanel && criteriaPanel.style.display !== 'none') {
+            const zips = document.getElementById('qc_zips')?.value;
+            const minP = document.getElementById('qc_min_price')?.value;
+            const maxP = document.getElementById('qc_max_price')?.value;
+            const ptypes = document.getElementById('qc_ptypes')?.value;
+            const cond = document.getElementById('qc_condition')?.value;
+            const strat = document.getElementById('qc_strategy')?.value;
+            const fund = document.getElementById('qc_funding')?.value;
+            const deals = document.getElementById('qc_deals')?.value;
+
+            if (zips) upd.zip_codes = zips;
+            if (minP) upd.min_price = parseInt(minP);
+            if (maxP) upd.max_price = parseInt(maxP);
+            if (ptypes) upd.property_types = ptypes;
+            if (cond) upd.condition_tolerance = cond;
+            if (strat) upd.strategy = strat;
+            if (fund) upd.funding_method = fund;
+            if (deals !== undefined) upd.deals_last_12_months = parseInt(deals) || 0;
+        }
+
         await db.from('buyers').update(upd).eq('id', data.contact_id);
     } else if (['listing_agent', 'other'].includes(data.contact_type)) {
         const upd = { last_contacted: todayStr };
@@ -1281,8 +1412,13 @@ window.saveActivity = async (action) => {
     }
 
     flash('Activity logged');
-    if (action === 'save_add') navigate('/activities/new');
-    else navigate('/activities');
+    if (action === 'save_add') {
+        navigate('/activities/new');
+    } else if (data.contact_type === 'buyer') {
+        navigate(`/buyers/${data.contact_id}`);
+    } else {
+        navigate('/activities');
+    }
 };
 
 // ── Init ────────────────────────────────────────────────────────────────────

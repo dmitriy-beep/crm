@@ -31,6 +31,7 @@ function badge(text, color) {
 function buyerStatusColor(s) {
     if (['verified_active', 'engaged'].includes(s)) return 'green';
     if (['contacted', 'criteria_collected'].includes(s)) return 'yellow';
+    if (s === 'not_investor') return 'orange';
     if (s === 'inactive') return 'gray';
     return 'blue';
 }
@@ -79,7 +80,7 @@ function getMatchingBuyers(property, buyers) {
     const matches = [];
 
     for (const b of buyers) {
-        if (b.status === 'inactive') continue;
+        if (['inactive', 'not_investor'].includes(b.status)) continue;
         // Skip buyers with incomplete criteria (e.g. unvetted imports)
         if (!b.zip_codes || !b.property_types || !b.condition_tolerance) continue;
 
