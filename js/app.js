@@ -1195,9 +1195,10 @@ window.filterActs = () => {
 
 // ── Activity Form ───────────────────────────────────────────────────────────
 async function renderActivityForm(params) {
-    const [{ data: buyers }, { data: contacts }] = await Promise.all([
+    const [{ data: buyers }, { data: contacts }, { data: allActivities }] = await Promise.all([
         db.from('buyers').select('*').order('name'),
-        db.from('contacts').select('id,name,role').order('name')
+        db.from('contacts').select('id,name,role').order('name'),
+        db.from('activity_log').select('*').order('created_at', { ascending: false })
     ]);
 
     const preType = params?.get('contact_type') || '';
@@ -1205,27 +1206,91 @@ async function renderActivityForm(params) {
 
     // Find the pre-selected buyer if applicable
     let preBuyer = null;
+    let buyerActivities = [];
     if (preType === 'buyer' && preId) {
         preBuyer = (buyers || []).find(b => String(b.id) === preId);
+        buyerActivities = (allActivities || []).filter(a => a.contact_type === 'buyer' && String(a.contact_id) === preId);
     }
 
-    const showQuickActions = preBuyer && ['new', 'contacted'].includes(preBuyer.status);
+    // Determine sequence step for new/contacted buyers
+    let seqStep = null;
+    let seqNext = null;
+    if (preBuyer && ['new', 'contacted'].includes(preBuyer.status)) {
+        const callCount = buyerActivities.filter(a => a.activity_type === 'call').length;
+        const textCount = buyerActivities.filter(a => a.activity_type === 'text').length;
+        const totalTouches = buyerActivities.length;
+
+        if (callCount === 0) { seqStep = 1; seqNext = 'day1_call'; }
+        else if (textCount === 0) { seqStep = 2; seqNext = 'day3_text'; }
+        else if (callCount === 1) { seqStep = 3; seqNext = 'day7_call'; }
+        else if (textCount === 1) { seqStep = 4; seqNext = 'day14_text'; }
+        else { seqStep = 5; seqNext = 'done'; }
+    }
+
+    const showSequence = preBuyer && seqNext && seqNext !== 'done';
+    const buyerFirstName = preBuyer ? (preBuyer.name || '').split(/[\s,]+/)[0] : '';
+
+    // Sequence info
+    const seqSteps = [
+        { step: 1, label: 'Day 1: Call', desc: 'Leave voicemail if no answer', type: 'call' },
+        { step: 2, label: 'Day 3: Text', desc: 'Intro text message', type: 'text' },
+        { step: 3, label: 'Day 7: 2nd Call', desc: 'Different time of day', type: 'call' },
+        { step: 4, label: 'Day 14: Final Text', desc: 'Soft close / leave door open', type: 'text' },
+    ];
+
+    // Follow-up date calculations
+    const todayDate = new Date();
+    const addDays = (d) => new Date(todayDate.getTime() + d * 86400000).toISOString().slice(0, 10);
+
+    // Text templates
+    const day3Text = `Hey ${buyerFirstName}, this is Dimitri with Dimalytics. I work with cash investors in the Sacramento/Placer area — if you're actively buying, I'd love to send you off-market leads that match your criteria. Worth a quick call?`;
+    const day14Text = `Hey ${buyerFirstName}, just circling back one more time. If the timing isn't right, no worries. My number's here if you ever need deal flow in the Sacramento/Placer area.`;
 
     app.innerHTML = `
     <h1 style="font-size:20px;font-weight:700;margin-bottom:16px;">Log Activity</h1>
 
-    ${showQuickActions ? `
+    ${showSequence ? `
     <div class="card" style="margin-bottom:16px;">
-      <h2>Quick Actions for ${preBuyer.name} ${badge(preBuyer.status, buyerStatusColor(preBuyer.status))}</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-        <button class="btn" onclick="quickAction('no_answer')" style="background:rgba(251,191,36,.15);border-color:var(--yellow);color:var(--yellow);">
-          📵 Couldn't Reach — follow up 1 week
+      <h2>Outreach Sequence — ${preBuyer.name} ${badge(preBuyer.status, buyerStatusColor(preBuyer.status))}</h2>
+      <div style="display:flex;gap:4px;margin:12px 0 16px;flex-wrap:wrap;">
+        ${seqSteps.map(s => {
+          const done = s.step < seqStep;
+          const current = s.step === seqStep;
+          const color = done ? 'var(--green)' : current ? 'var(--accent)' : 'var(--border)';
+          const bg = done ? 'rgba(52,211,153,.1)' : current ? 'rgba(79,140,255,.15)' : 'transparent';
+          return `<div style="flex:1;min-width:140px;padding:8px 12px;border:1px solid ${color};border-radius:var(--radius);background:${bg};font-size:12px;">
+            <div style="font-weight:700;color:${done ? 'var(--green)' : current ? 'var(--accent)' : 'var(--text2)'}">${done ? '✓ ' : current ? '→ ' : ''}${s.label}</div>
+            <div style="color:var(--text2);margin-top:2px;">${s.desc}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Call Outcome</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${seqNext === 'day3_text' || seqNext === 'day14_text' ? `
+        <button class="btn" onclick="quickAction('send_text')" style="background:rgba(79,140,255,.15);border-color:var(--accent);color:var(--accent);">
+          💬 Send Text${seqNext === 'day14_text' ? ' (Final)' : ''}
         </button>
-        <button class="btn" onclick="quickAction('reached_investor')" style="background:rgba(52,211,153,.15);border-color:var(--green);color:var(--green);">
-          ✅ Reached — Investor (fill criteria)
+        ` : ''}
+        ${seqNext === 'day1_call' || seqNext === 'day7_call' ? `
+        <button class="btn" onclick="quickAction('voicemail')" style="background:rgba(251,191,36,.15);border-color:var(--yellow);color:var(--yellow);">
+          📵 Voicemail / No Answer
+        </button>
+        <button class="btn" onclick="quickAction('callback')" style="background:rgba(79,140,255,.15);border-color:var(--accent);color:var(--accent);">
+          📞 Callback Requested
+        </button>
+        ` : ''}
+        <button class="btn" onclick="quickAction('conversation_hot')" style="background:rgba(52,211,153,.15);border-color:var(--green);color:var(--green);">
+          🔥 Conversation — Hot (gave criteria, wants deals)
+        </button>
+        <button class="btn" onclick="quickAction('conversation_warm')" style="background:rgba(251,191,36,.15);border-color:var(--yellow);color:var(--yellow);">
+          🤝 Conversation — Warm (interested but vague)
+        </button>
+        <button class="btn" onclick="quickAction('not_interested')" style="background:rgba(139,144,165,.15);border-color:var(--text2);color:var(--text2);">
+          🙅 Not Interested
         </button>
         <button class="btn" onclick="quickAction('not_investor')" style="background:rgba(251,146,60,.15);border-color:var(--orange);color:var(--orange);">
-          🚫 Reached — Not an Investor (marketing list)
+          🚫 Not an Investor → Marketing List
         </button>
         <button class="btn" onclick="quickAction('wrong_number')" style="background:rgba(248,113,113,.15);border-color:var(--red);color:var(--red);">
           ❌ Wrong Number / Bad Contact
@@ -1247,9 +1312,30 @@ async function renderActivityForm(params) {
         </div>
         <div class="form-group"><label>Contact *</label><select name="contact_id" id="act_cid" required><option value="">Select type first…</option></select></div>
         <div class="form-group"><label>Activity Type *</label><select name="activity_type" id="act_atype">${['call','text','email','meeting','offer_submitted','offer_accepted','offer_rejected','note'].map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Call Outcome</label>
+          <select name="call_outcome" id="act_outcome">
+            <option value="">— N/A —</option>
+            ${['conversation','voicemail','wrong_number','not_interested','callback_requested'].map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Contact Classification</label>
+          <select name="contact_class" id="act_class">
+            <option value="">— Unknown —</option>
+            <option value="investor">Investor</option>
+            <option value="not_investor">Not an Investor</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Engagement Level</label>
+          <select name="engagement" id="act_engagement">
+            <option value="">— N/A —</option>
+            <option value="hot">🔥 Hot — gave criteria, wants deals</option>
+            <option value="warm">🤝 Warm — interested but vague</option>
+            <option value="cold">❄️ Cold — not interested / unreachable</option>
+          </select>
+        </div>
         <div class="form-group"><label>Follow-up Date</label><input type="date" name="followup_date" id="act_fdate"></div>
-        <div class="form-group full"><label>Description *</label><textarea name="description" id="act_desc" required placeholder="What happened?"></textarea></div>
         <div class="form-group"><label style="display:inline-flex;align-items:center;gap:6px;text-transform:none;font-size:13px;"><input type="checkbox" name="followup_needed" id="act_fchk"> Follow-up Needed</label></div>
+        <div class="form-group full"><label>Notes / Intel *</label><textarea name="description" id="act_desc" required placeholder="What happened? Areas they mentioned, properties discussed, partners, complaints about other agents/wholesalers, anything specific…" style="min-height:100px;"></textarea></div>
         <div class="form-group"><label>Update Buyer Status</label>
           <select name="new_status" id="act_new_status">
             <option value="">— No change —</option>
@@ -1264,18 +1350,26 @@ async function renderActivityForm(params) {
       </div>
     </form>
 
-    ${showQuickActions && preBuyer.status === 'new' ? `
     <div id="criteria-panel" class="card" style="display:none;margin-top:16px;">
-      <h2>Fill Buyer Criteria — ${preBuyer.name}</h2>
+      <h2>Fill Buyer Criteria${preBuyer ? ' — ' + preBuyer.name : ''}</h2>
       <div class="form-grid" style="margin-top:12px;">
-        <div class="form-group full"><label>Target Zip Codes (comma-separated)</label><input type="text" id="qc_zips" value="${preBuyer.zip_codes||''}" placeholder="95747,95678,95677"></div>
-        <div class="form-group"><label>Min Price ($)</label><input type="number" id="qc_min_price" value="${preBuyer.min_price||''}"></div>
-        <div class="form-group"><label>Max Price ($)</label><input type="number" id="qc_max_price" value="${preBuyer.max_price||''}"></div>
-        <div class="form-group"><label>Property Types (comma-separated)</label><input type="text" id="qc_ptypes" value="${preBuyer.property_types||''}" placeholder="sfr,multi,land,condo"></div>
+        <div class="form-group full"><label>Target Zip Codes (comma-separated)</label><input type="text" id="qc_zips" value="${preBuyer?.zip_codes||''}" placeholder="95747,95678,95677"></div>
+        <div class="form-group"><label>Min Price ($)</label><input type="number" id="qc_min_price" value="${preBuyer?.min_price||''}"></div>
+        <div class="form-group"><label>Max Price ($)</label><input type="number" id="qc_max_price" value="${preBuyer?.max_price||''}"></div>
+        <div class="form-group"><label>Property Types (comma-separated)</label><input type="text" id="qc_ptypes" value="${preBuyer?.property_types||''}" placeholder="sfr,multi,land,condo"></div>
         <div class="form-group"><label>Condition Tolerance</label><select id="qc_condition">${['','turnkey','cosmetic','medium_rehab','full_gut'].map(s=>`<option value="${s}">${s ? s.replace(/_/g,' ') : '— select —'}</option>`).join('')}</select></div>
         <div class="form-group"><label>Strategy</label><select id="qc_strategy">${['','flip','brrrr','rental_hold','wholesale'].map(s=>`<option value="${s}">${s === 'brrrr' ? 'BRRRR' : (s ? s.replace(/_/g,' ') : '— select —')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Funding Method</label><select id="qc_funding">${['','cash','hard_money','conventional','private_money'].map(s=>`<option value="${s}">${s ? s.replace(/_/g,' ') : '— select —'}</option>`).join('')}</select></div>
-        <div class="form-group"><label>Deals (12mo)</label><input type="number" id="qc_deals" value="${preBuyer.deals_last_12_months||0}"></div>
+        <div class="form-group"><label>Deals (12mo)</label><input type="number" id="qc_deals" value="${preBuyer?.deals_last_12_months||0}"></div>
+      </div>
+    </div>
+
+    ${showSequence && (seqNext === 'day3_text' || seqNext === 'day14_text') ? `
+    <div class="card" style="margin-top:16px;">
+      <h2>Text Template</h2>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-size:13px;line-height:1.6;margin-top:8px;white-space:pre-wrap;" id="text-template">${seqNext === 'day14_text' ? day14Text : day3Text}</div>
+      <div style="margin-top:8px;">
+        <button class="btn btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('text-template').textContent);flash('Copied to clipboard');">Copy Text</button>
       </div>
     </div>
     ` : ''}
@@ -1285,6 +1379,8 @@ async function renderActivityForm(params) {
     window._actContacts = contacts || [];
     window._actPreId = preId;
     window._actPreBuyer = preBuyer;
+    window._actSeqNext = seqNext;
+    window._actSeqStep = seqStep;
 
     if (preType) updateActContacts();
     document.getElementById('actForm').addEventListener('submit', e => { e.preventDefault(); saveActivity('save'); });
@@ -1295,49 +1391,114 @@ window.quickAction = (action) => {
     const fchk = document.getElementById('act_fchk');
     const fdate = document.getElementById('act_fdate');
     const atype = document.getElementById('act_atype');
+    const outcome = document.getElementById('act_outcome');
+    const contactClass = document.getElementById('act_class');
+    const engagement = document.getElementById('act_engagement');
     const newStatus = document.getElementById('act_new_status');
     const criteriaPanel = document.getElementById('criteria-panel');
 
-    // Calculate dates
     const todayDate = new Date();
-    const oneWeek = new Date(todayDate.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+    const addDays = (d) => new Date(todayDate.getTime() + d * 86400000).toISOString().slice(0, 10);
+    const seqNext = window._actSeqNext;
 
-    if (action === 'no_answer') {
+    // Reset
+    if (criteriaPanel) criteriaPanel.style.display = 'none';
+
+    if (action === 'voicemail') {
         atype.value = 'call';
-        desc.value = 'Called — no answer / voicemail left.';
-        fchk.checked = true;
-        fdate.value = oneWeek;
+        outcome.value = 'voicemail';
+        contactClass.value = '';
+        engagement.value = 'cold';
         newStatus.value = 'contacted';
-        if (criteriaPanel) criteriaPanel.style.display = 'none';
+        desc.value = 'Called — no answer, left voicemail.';
+        fchk.checked = true;
+        // Follow-up based on sequence position
+        if (seqNext === 'day1_call') fdate.value = addDays(3); // next: Day 3 text
+        else if (seqNext === 'day7_call') fdate.value = addDays(7); // next: Day 14 text
+        else fdate.value = addDays(7);
     }
-    else if (action === 'reached_investor') {
+    else if (action === 'send_text') {
+        atype.value = 'text';
+        outcome.value = '';
+        contactClass.value = '';
+        engagement.value = '';
+        newStatus.value = 'contacted';
+        if (seqNext === 'day14_text') {
+            desc.value = 'Sent final follow-up text. Leaving door open.';
+            fchk.checked = false;
+            fdate.value = '';
+        } else {
+            desc.value = 'Sent intro text message.';
+            fchk.checked = true;
+            fdate.value = addDays(4); // next: Day 7 call
+        }
+    }
+    else if (action === 'callback') {
         atype.value = 'call';
-        desc.value = 'Reached — confirmed investor. Collecting criteria.';
-        fchk.checked = false;
-        fdate.value = '';
+        outcome.value = 'callback_requested';
+        contactClass.value = '';
+        engagement.value = 'warm';
+        newStatus.value = 'contacted';
+        desc.value = 'Reached — asked for callback. ';
+        fchk.checked = true;
+        fdate.value = addDays(1);
+        desc.focus();
+    }
+    else if (action === 'conversation_hot') {
+        atype.value = 'call';
+        outcome.value = 'conversation';
+        contactClass.value = 'investor';
+        engagement.value = 'hot';
         newStatus.value = 'criteria_collected';
+        desc.value = 'Conversation — active investor, gave criteria. Wants to see deals.\n\nAreas: \nPrice range: \nStrategy: \nFunding: \nVolume: \nNotes: ';
+        fchk.checked = true;
+        fdate.value = addDays(1);
         if (criteriaPanel) criteriaPanel.style.display = 'block';
         desc.focus();
     }
-    else if (action === 'not_investor') {
+    else if (action === 'conversation_warm') {
         atype.value = 'call';
-        desc.value = 'Reached — not an active investor. Moved to marketing list.';
+        outcome.value = 'conversation';
+        contactClass.value = 'investor';
+        engagement.value = 'warm';
+        newStatus.value = 'contacted';
+        desc.value = 'Conversation — interested but vague on criteria.\n\nNotes: ';
+        fchk.checked = true;
+        fdate.value = addDays(7);
+        desc.focus();
+    }
+    else if (action === 'not_interested') {
+        atype.value = 'call';
+        outcome.value = 'not_interested';
+        contactClass.value = '';
+        engagement.value = 'cold';
+        newStatus.value = 'inactive';
+        desc.value = 'Not interested.';
         fchk.checked = false;
         fdate.value = '';
+    }
+    else if (action === 'not_investor') {
+        atype.value = 'call';
+        outcome.value = 'conversation';
+        contactClass.value = 'not_investor';
+        engagement.value = 'cold';
         newStatus.value = 'not_investor';
-        if (criteriaPanel) criteriaPanel.style.display = 'none';
+        desc.value = 'Reached — not an active investor. Moved to marketing list.\n\nNotes: ';
+        fchk.checked = false;
+        fdate.value = '';
         desc.focus();
     }
     else if (action === 'wrong_number') {
         atype.value = 'call';
+        outcome.value = 'wrong_number';
+        contactClass.value = '';
+        engagement.value = 'cold';
+        newStatus.value = 'inactive';
         desc.value = 'Wrong number / disconnected / bad contact info.';
         fchk.checked = false;
         fdate.value = '';
-        newStatus.value = 'inactive';
-        if (criteriaPanel) criteriaPanel.style.display = 'none';
     }
 
-    // Scroll to form
     document.getElementById('actForm').scrollIntoView({ behavior: 'smooth' });
 };
 
@@ -1360,11 +1521,24 @@ window.updateActContacts = () => {
 window.saveActivity = async (action) => {
     const form = document.getElementById('actForm');
     const fd = new FormData(form);
+
+    // Build structured description with outcome/classification/engagement
+    let descParts = [];
+    const outcome = document.getElementById('act_outcome')?.value;
+    const contactClass = document.getElementById('act_class')?.value;
+    const engagement = document.getElementById('act_engagement')?.value;
+    if (outcome) descParts.push(`Outcome: ${outcome.replace(/_/g, ' ')}`);
+    if (contactClass) descParts.push(`Type: ${contactClass.replace(/_/g, ' ')}`);
+    if (engagement) descParts.push(`Engagement: ${engagement}`);
+
+    const rawDesc = (fd.get('description') || '').trim();
+    const fullDesc = descParts.length ? `[${descParts.join(' | ')}]\n${rawDesc}` : rawDesc;
+
     const data = {
         contact_type: fd.get('contact_type'),
         contact_id: parseInt(fd.get('contact_id')),
         activity_type: fd.get('activity_type'),
-        description: fd.get('description') || null,
+        description: fullDesc || null,
         followup_needed: form.querySelector('[name=followup_needed]').checked,
         followup_date: fd.get('followup_date') || null,
     };
