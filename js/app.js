@@ -221,6 +221,7 @@ function showPropStreamBuyerPreview(owners, batchName) {
     const buyers = owners.map(o => {
         const noteParts = [];
         if (o.firstName || o.lastName) noteParts.push(`Contact: ${[o.firstName, o.lastName].filter(Boolean).join(' ')}`);
+        if (o.portfolioTier) noteParts.push(`Portfolio: ${o.portfolioTier} properties`);
         if (o.addresses.length) noteParts.push(`Property addresses:\n${o.addresses.join('\n')}`);
         if (o.mailAddr) noteParts.push(`Mail: ${o.mailAddr}`);
         if (o.emails.length > 1) noteParts.push(`Other emails: ${o.emails.slice(1).join(', ')}`);
@@ -234,6 +235,7 @@ function showPropStreamBuyerPreview(owners, batchName) {
             phone: o.phones[0] || null,
             email: o.emails[0] || null,
             notes: noteParts.join('\n'),
+            portfolioTier: o.portfolioTier,
         };
     });
 
@@ -255,11 +257,12 @@ function showPropStreamBuyerPreview(owners, batchName) {
       </div>
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th style="width:30px;"><input type="checkbox" id="psb-check-all" checked onchange="toggleAllPropStreamBuyer(this.checked)"></th><th>Name</th><th>Entity</th><th>Phone</th><th>Email</th><th>Notes Preview</th></tr>
+      <tr><th style="width:30px;"><input type="checkbox" id="psb-check-all" checked onchange="toggleAllPropStreamBuyer(this.checked)"></th><th>Name</th><th>Entity</th><th>Portfolio</th><th>Phone</th><th>Email</th><th>Notes Preview</th></tr>
       ${buyers.map((b, i) => `<tr>
         <td><input type="checkbox" class="psb-row-check" data-idx="${i}" checked></td>
         <td><strong>${b.name}</strong></td>
         <td class="text-sm text-muted">${b.entity_name || '—'}</td>
+        <td>${b.portfolioTier ? badge(b.portfolioTier, tierColor(b.portfolioTier)) : '—'}</td>
         <td>${b.phone || '—'}</td>
         <td>${b.email || '—'}</td>
         <td class="text-sm text-muted" style="max-width:300px;white-space:pre-wrap;">${(b.notes || '').slice(0, 120)}${b.notes.length > 120 ? '…' : ''}</td>
@@ -932,10 +935,13 @@ function parsePropStreamCSV(text) {
                 mailAddr: mailAddr || null,
                 type: get('Type'),
                 status: get('Status'),
+                portfolioTier: get('Portfolio Tier') || null,
             });
         }
         const owner = ownerMap.get(key);
         if (propAddr && !owner.addresses.includes(propAddr)) owner.addresses.push(propAddr);
+        // Update tier if this row has one and existing doesn't
+        if (!owner.portfolioTier && get('Portfolio Tier')) owner.portfolioTier = get('Portfolio Tier');
         phones.forEach(p => { if (!owner.phones.includes(p)) owner.phones.push(p); });
         dncPhones.forEach(p => { if (!owner.dncPhones.includes(p)) owner.dncPhones.push(p); });
         emails.forEach(e => { if (!owner.emails.includes(e)) owner.emails.push(e); });
@@ -949,6 +955,7 @@ function showPropStreamPreview(owners, batchName) {
     const contacts = owners.map(o => {
         const noteParts = [];
         if (o.firstName || o.lastName) noteParts.push(`Contact: ${[o.firstName, o.lastName].filter(Boolean).join(' ')}`);
+        if (o.portfolioTier) noteParts.push(`Portfolio: ${o.portfolioTier} properties`);
         if (o.addresses.length) noteParts.push(`Property addresses:\n${o.addresses.join('\n')}`);
         if (o.mailAddr) noteParts.push(`Mail: ${o.mailAddr}`);
         if (o.emails.length > 1) noteParts.push(`Other emails: ${o.emails.slice(1).join(', ')}`);
@@ -963,6 +970,7 @@ function showPropStreamPreview(owners, batchName) {
             role: 'other',
             company: null,
             notes: noteParts.join('\n'),
+            portfolioTier: o.portfolioTier,
         };
     });
 
@@ -983,10 +991,11 @@ function showPropStreamPreview(owners, batchName) {
       </div>
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table>
-      <tr><th style="width:30px;"><input type="checkbox" id="ps-check-all" checked onchange="toggleAllPropStream(this.checked)"></th><th>Name</th><th>Phone</th><th>Email</th><th>Notes Preview</th></tr>
+      <tr><th style="width:30px;"><input type="checkbox" id="ps-check-all" checked onchange="toggleAllPropStream(this.checked)"></th><th>Name</th><th>Portfolio</th><th>Phone</th><th>Email</th><th>Notes Preview</th></tr>
       ${contacts.map((c, i) => `<tr>
         <td><input type="checkbox" class="ps-row-check" data-idx="${i}" checked></td>
         <td><strong>${c.name}</strong></td>
+        <td>${c.portfolioTier ? badge(c.portfolioTier, tierColor(c.portfolioTier)) : '—'}</td>
         <td>${c.phone || '—'}</td>
         <td>${c.email || '—'}</td>
         <td class="text-sm text-muted" style="max-width:300px;white-space:pre-wrap;">${(c.notes || '').slice(0, 120)}${c.notes.length > 120 ? '…' : ''}</td>

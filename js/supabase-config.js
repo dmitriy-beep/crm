@@ -43,6 +43,16 @@ function propStatusColor(s) {
     return 'blue';
 }
 
+// Helper: portfolio tier badge color (higher = more properties = hotter lead)
+function tierColor(tier) {
+    if (!tier) return 'gray';
+    const first = parseInt(tier);
+    if (first >= 20) return 'red';
+    if (first >= 11) return 'orange';
+    if (first >= 6) return 'yellow';
+    return 'blue';
+}
+
 // Helper: get today as YYYY-MM-DD
 function today() {
     return new Date().toISOString().slice(0, 10);
