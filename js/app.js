@@ -165,9 +165,10 @@ async function renderBuyersList(params) {
       <button class="btn btn-sm btn-danger" onclick="deleteBatch('buyers','${batch.replace(/'/g,"\\'")}')" >Delete Batch</button>` : ''}
     </div>
     <div class="card" style="padding:0;overflow-x:auto;"><table id="tbl-buyers">
-      <tr><th data-sort="Name">Name</th><th data-sort="Status">Status</th><th data-sort="Strategy">Strategy</th><th data-sort="Price" data-type="number">Price Range</th><th>Zips</th><th data-sort="Condition">Condition</th><th data-sort="Funding">Funding</th><th data-sort="POF">POF</th><th data-sort="Deals" data-type="number">Deals</th><th data-sort="Followup" data-type="date">Next F/U</th>${batches.length ? '<th data-sort="Import">Import</th>' : ''}<th></th></tr>
-      ${filtered.map(b => `<tr data-row data-sortName="${(b.name||'').replace(/"/g,'&quot;')}" data-sortStatus="${b.status||''}" data-sortStrategy="${b.strategy||''}" data-sortPrice="${b.max_price||0}" data-sortCondition="${b.condition_tolerance||''}" data-sortFunding="${b.funding_method||''}" data-sortPOF="${b.proof_of_funds_verified?'1':'0'}" data-sortDeals="${b.deals_last_12_months||0}" data-sortFollowup="${b.next_followup||''}" ${batches.length ? `data-sortImport="${b.import_batch||''}"` : ''}>
+      <tr><th data-sort="Name">Name</th><th data-sort="Portfolio" data-type="number">Portfolio</th><th data-sort="Status">Status</th><th data-sort="Strategy">Strategy</th><th data-sort="Price" data-type="number">Price Range</th><th>Zips</th><th data-sort="Condition">Condition</th><th data-sort="Funding">Funding</th><th data-sort="POF">POF</th><th data-sort="Deals" data-type="number">Deals</th><th data-sort="Followup" data-type="date">Next F/U</th>${batches.length ? '<th data-sort="Import">Import</th>' : ''}<th></th></tr>
+      ${filtered.map(b => `<tr data-row data-sortName="${(b.name||'').replace(/"/g,'&quot;')}" data-sortPortfolio="${parseInt(b.portfolio_tier)||0}" data-sortStatus="${b.status||''}" data-sortStrategy="${b.strategy||''}" data-sortPrice="${b.max_price||0}" data-sortCondition="${b.condition_tolerance||''}" data-sortFunding="${b.funding_method||''}" data-sortPOF="${b.proof_of_funds_verified?'1':'0'}" data-sortDeals="${b.deals_last_12_months||0}" data-sortFollowup="${b.next_followup||''}" ${batches.length ? `data-sortImport="${b.import_batch||''}"` : ''}>
         <td><a href="/buyers/${b.id}"><strong>${b.name}</strong></a>${b.entity_name ? `<br><span class="text-muted text-sm">${b.entity_name}</span>` : ''}</td>
+        <td>${b.portfolio_tier ? badge(b.portfolio_tier, tierColor(b.portfolio_tier)) : ''}</td>
         <td>${badge(b.status, buyerStatusColor(b.status))}</td>
         <td>${(b.strategy || '').replace(/_/g,' ')}</td>
         <td class="money">${fmt(b.min_price)} – ${fmt(b.max_price)}</td>
@@ -180,7 +181,7 @@ async function renderBuyersList(params) {
         ${batches.length ? `<td class="text-sm text-muted">${b.import_batch || ''}</td>` : ''}
         <td style="white-space:nowrap;"><a href="/buyers/${b.id}/edit" class="btn btn-sm">Edit</a> <button class="btn btn-sm btn-danger" onclick="deleteBuyer(${b.id})">Del</button></td>
       </tr>`).join('')}
-      ${filtered.length === 0 ? `<tr><td colspan="${batches.length ? 12 : 11}" class="text-muted" style="text-align:center;padding:24px;">No buyers found.</td></tr>` : ''}
+      ${filtered.length === 0 ? `<tr><td colspan="${batches.length ? 13 : 12}" class="text-muted" style="text-align:center;padding:24px;">No buyers found.</td></tr>` : ''}
     </table></div>`;
 
     window._buyersData = buyers;
@@ -301,6 +302,7 @@ window.confirmPropStreamBuyerImport = async () => {
         deals_last_12_months: 0,
         notes: buyers[i].notes,
         import_batch: batchName,
+        portfolio_tier: buyers[i].portfolioTier || null,
     }));
 
     let inserted = 0;
@@ -347,6 +349,7 @@ async function renderBuyerForm(id) {
         <div class="form-group"><label>Strategy</label><select name="strategy">${['flip','brrrr','rental_hold','wholesale'].map(s=>`<option value="${s}" ${sel('strategy',s)}>${s === 'brrrr' ? 'BRRRR' : s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Funding Method</label><select name="funding_method">${['cash','hard_money','conventional','private_money'].map(s=>`<option value="${s}" ${sel('funding_method',s)}>${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Deals (12mo)</label><input type="number" name="deals_last_12_months" value="${v('deals_last_12_months') || 0}"></div>
+        <div class="form-group"><label>Portfolio Tier</label><select name="portfolio_tier"><option value="">— Unknown —</option>${['1-3','4-5','6-10','11-19','20-49','50+'].map(s=>`<option value="${s}" ${v('portfolio_tier')===s?'selected':''}>${s} properties</option>`).join('')}</select></div>
         <div class="form-group"><label>Status</label><select name="status">${['new','contacted','criteria_collected','engaged','verified_active','not_investor','inactive'].map(s=>`<option value="${s}" ${sel('status',s)}>${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Next Follow-up</label><input type="date" name="next_followup" value="${v('next_followup')}"></div>
         <div class="form-group"><label>Last Contacted</label><input type="date" name="last_contacted" value="${v('last_contacted')}"></div>
@@ -379,6 +382,7 @@ window.saveBuyer = async (action) => {
         strategy: fd.get('strategy'), funding_method: fd.get('funding_method'),
         proof_of_funds_verified: form.querySelector('[name=proof_of_funds_verified]').checked,
         deals_last_12_months: parseInt(fd.get('deals_last_12_months')) || 0,
+        portfolio_tier: fd.get('portfolio_tier') || null,
         preferred_contact: fd.get('preferred_contact'),
         status: fd.get('status'), notes: fd.get('notes') || null,
         last_contacted: fd.get('last_contacted') || null,
@@ -440,6 +444,7 @@ async function renderBuyerDetail(id) {
       <div class="field"><div class="label">Condition Tolerance</div><div class="value">${(buyer.condition_tolerance||'').replace(/_/g,' ')}</div></div>
       <div class="field"><div class="label">POF Verified</div><div class="value">${buyer.proof_of_funds_verified ? '✓ Yes' : '✗ No'}</div></div>
       <div class="field"><div class="label">Deals (12mo)</div><div class="value">${buyer.deals_last_12_months}</div></div>
+      <div class="field"><div class="label">Portfolio Tier</div><div class="value">${buyer.portfolio_tier ? badge(buyer.portfolio_tier + ' properties', tierColor(buyer.portfolio_tier)) : '—'}</div></div>
     </div>
     ${buyer.notes ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);"><div class="label text-sm">NOTES</div><div>${buyer.notes}</div></div>` : ''}
     </div>
