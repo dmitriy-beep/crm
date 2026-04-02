@@ -79,6 +79,12 @@ tr:hover td { background:var(--surface2); }
 .filters input, .filters select { padding:6px 10px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; }
 .filters input:focus, .filters select:focus { outline:none; border-color:var(--accent); }
 
+.status-filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.status-btn { display:inline-flex; align-items:center; gap:6px; padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid color-mix(in srgb, var(--btn-color) 40%, transparent); background:color-mix(in srgb, var(--btn-color) 8%, transparent); color:var(--btn-color); cursor:pointer; transition:all .15s; text-transform:capitalize; }
+.status-btn:hover { background:color-mix(in srgb, var(--btn-color) 18%, transparent); border-color:color-mix(in srgb, var(--btn-color) 60%, transparent); }
+.status-btn-active { background:color-mix(in srgb, var(--btn-color) 22%, transparent); border-color:var(--btn-color); box-shadow:0 0 0 1px color-mix(in srgb, var(--btn-color) 30%, transparent); }
+.status-count { background:color-mix(in srgb, var(--btn-color) 20%, transparent); padding:1px 7px; border-radius:10px; font-size:11px; font-weight:700; min-width:20px; text-align:center; }
+
 .flash { padding:10px 16px; border-radius:var(--radius); margin-bottom:16px; font-size:13px; animation: fadeout 4s forwards; }
 .flash-success { background:rgba(52,211,153,.15); color:var(--green); border:1px solid rgba(52,211,153,.3); }
 .flash-error { background:rgba(248,113,113,.15); color:var(--red); border:1px solid rgba(248,113,113,.3); }

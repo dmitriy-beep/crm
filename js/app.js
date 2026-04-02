@@ -155,9 +155,23 @@ async function renderBuyersList(params) {
         <a href="/buyers/new" class="btn btn-sm btn-primary">+ Add Buyer</a>
       </div>
     </div>
+    <div class="status-filters">
+      ${(() => {
+        const allStatuses = ['new','contacted','criteria_collected','engaged','verified_active','not_investor','inactive'];
+        const statusCounts = {};
+        allStatuses.forEach(s => { statusCounts[s] = 0; });
+        (buyers || []).forEach(b => { if (statusCounts[b.status] !== undefined) statusCounts[b.status]++; });
+        const total = (buyers || []).length;
+        return `<button class="status-btn ${!status ? 'status-btn-active' : ''}" style="--btn-color:var(--accent);" onclick="filterBuyerStatus('')">All <span class="status-count">${total}</span></button>` +
+          allStatuses.map(s => {
+            const color = buyerStatusColor(s);
+            const colorVar = { green:'var(--green)', yellow:'var(--yellow)', blue:'var(--accent)', orange:'var(--orange)', gray:'var(--text2)', red:'var(--red)' }[color] || 'var(--text2)';
+            return `<button class="status-btn ${status===s ? 'status-btn-active' : ''}" style="--btn-color:${colorVar};" onclick="filterBuyerStatus('${s}')">${s.replace(/_/g,' ')} <span class="status-count">${statusCounts[s]}</span></button>`;
+          }).join('');
+      })()}
+    </div>
     <div class="filters">
       <input type="text" id="f-search" placeholder="Search name/email…" value="${search || ''}">
-      <select id="f-status"><option value="">All Status</option>${['new','contacted','criteria_collected','engaged','verified_active','not_investor','inactive'].map(s => `<option value="${s}" ${status===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
       <select id="f-strategy"><option value="">All Strategies</option>${['flip','brrrr','rental_hold','wholesale'].map(s => `<option value="${s}" ${strategy===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
       <input type="text" id="f-zip" placeholder="Zip" value="${zip || ''}" style="width:100px;">
       ${batches.length ? `<select id="f-batch"><option value="">All Imports</option>${batches.map(b => `<option value="${b}" ${batch===b?'selected':''}>${b}</option>`).join('')}</select>` : ''}
@@ -193,10 +207,19 @@ async function renderBuyersList(params) {
 window.filterBuyers = () => {
     const params = new URLSearchParams();
     const s = document.getElementById('f-search').value; if (s) params.set('search', s);
-    const st = document.getElementById('f-status').value; if (st) params.set('status', st);
+    // Preserve current status filter if active
+    const currentStatus = new URLSearchParams(location.search).get('status');
+    if (currentStatus) params.set('status', currentStatus);
     const str = document.getElementById('f-strategy').value; if (str) params.set('strategy', str);
     const z = document.getElementById('f-zip').value; if (z) params.set('zip', z);
     const b = document.getElementById('f-batch')?.value; if (b) params.set('batch', b);
+    navigate('/buyers' + (params.toString() ? '?' + params.toString() : ''));
+};
+
+window.filterBuyerStatus = (status) => {
+    const params = new URLSearchParams(location.search);
+    if (status) params.set('status', status);
+    else params.delete('status');
     navigate('/buyers' + (params.toString() ? '?' + params.toString() : ''));
 };
 
