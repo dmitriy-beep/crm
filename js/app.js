@@ -360,18 +360,26 @@ window.confirmPropStreamBuyerImport = async () => {
 
 // ── Call List ───────────────────────────────────────────────────────────────
 async function renderCallList(params) {
-    app.innerHTML = '<div class="loading">Loading call list…</div>';
-    const [{ data: buyers }, { data: activities }] = await Promise.all([
-        db.from('buyers').select('*').order('name'),
-        db.from('activity_log').select('*').eq('contact_type', 'buyer').order('created_at', { ascending: false })
-    ]);
+    if (!_cache.buyers || !_cache.buyerActivities) {
+        app.innerHTML = '<div class="loading">Loading call list…</div>';
+        const [{ data: buyers }, { data: activities }] = await Promise.all([
+            db.from('buyers').select('*').order('name'),
+            db.from('activity_log').select('*').eq('contact_type', 'buyer').order('created_at', { ascending: false })
+        ]);
+        _cache.buyers = buyers || [];
+        _cache.buyerActivities = activities || [];
+    }
+    const buyers = _cache.buyers;
+    const activities = _cache.buyerActivities;
 
-    let filtered = (buyers || []).filter(b => {
-        // Only show callable buyers: have at least one non-DNC phone, and not inactive/not_investor
+    // Callable buyers base set (before status filter)
+    const callable = (buyers || []).filter(b => {
         if (['inactive', 'not_investor'].includes(b.status)) return false;
         if (!b.phone) return false;
         return true;
     });
+
+    let filtered = [...callable];
 
     const batch = params?.get('batch');
     const status = params?.get('status');
@@ -415,6 +423,12 @@ async function renderCallList(params) {
         return { label: 'Sequence done', color: 'gray' };
     }
 
+    // Status counts from callable buyers (not filtered by status)
+    const callableStatuses = ['new','contacted','criteria_collected','engaged','verified_active'];
+    const statusCounts = {};
+    callableStatuses.forEach(s => { statusCounts[s] = 0; });
+    callable.forEach(b => { if (statusCounts[b.status] !== undefined) statusCounts[b.status]++; });
+
     app.innerHTML = `
     <div class="flex justify-between items-center mb-2">
       <h1 style="font-size:20px;font-weight:700;">📞 Call List</h1>
@@ -428,8 +442,15 @@ async function renderCallList(params) {
         Sorted by outreach progress then portfolio size. Click a row's phone to copy, address to copy for PropStream lookup.
       </div>
     </div>
+    <div class="status-filters">
+      <button class="status-btn ${!status ? 'status-btn-active' : ''}" style="--btn-color:var(--accent);" onclick="filterCallListStatus('')">All <span class="status-count">${callable.length}</span></button>
+      ${callableStatuses.map(s => {
+        const color = buyerStatusColor(s);
+        const colorVar = { green:'var(--green)', yellow:'var(--yellow)', blue:'var(--accent)', orange:'var(--orange)', gray:'var(--text2)', red:'var(--red)' }[color] || 'var(--text2)';
+        return `<button class="status-btn ${status===s ? 'status-btn-active' : ''}" style="--btn-color:${colorVar};" onclick="filterCallListStatus('${s}')">${s.replace(/_/g,' ')} <span class="status-count">${statusCounts[s]}</span></button>`;
+      }).join('')}
+    </div>
     <div class="filters">
-      <select id="cl-status"><option value="">All Status</option>${['new','contacted','criteria_collected','engaged','verified_active'].map(s=>`<option value="${s}" ${status===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
       ${batches.length ? `<select id="cl-batch"><option value="">All Imports</option>${batches.map(b=>`<option value="${b}" ${batch===b?'selected':''}>${b}</option>`).join('')}</select>` : ''}
       ${tiers.length ? `<select id="cl-tier"><option value="">All Tiers</option>${tiers.map(t=>`<option value="${t}" ${tier===t?'selected':''}>${t} properties</option>`).join('')}</select>` : ''}
       <button class="btn btn-sm" onclick="filterCallList()">Filter</button>
@@ -485,10 +506,19 @@ window.copyText = (text) => {
 
 window.filterCallList = () => {
     const params = new URLSearchParams();
-    const st = document.getElementById('cl-status')?.value; if (st) params.set('status', st);
+    // Preserve current status filter if active
+    const currentStatus = new URLSearchParams(location.search).get('status');
+    if (currentStatus) params.set('status', currentStatus);
     const b = document.getElementById('cl-batch')?.value; if (b) params.set('batch', b);
     const t = document.getElementById('cl-tier')?.value; if (t) params.set('tier', t);
     navigate('/buyers/calllist' + (params.toString() ? '?' + params : ''));
+};
+
+window.filterCallListStatus = (status) => {
+    const params = new URLSearchParams(location.search);
+    if (status) params.set('status', status);
+    else params.delete('status');
+    navigate('/buyers/calllist' + (params.toString() ? '?' + params.toString() : ''));
 };
 
 // ── Buyer Form ──────────────────────────────────────────────────────────────
@@ -1803,6 +1833,7 @@ window.saveActivity = async (action) => {
     }
 
     invalidateCache('buyers');
+    invalidateCache('buyerActivities');
     invalidateCache('contacts');
     flash('Activity logged');
     if (action === 'save_add') {
