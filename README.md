@@ -88,7 +88,7 @@ dealengine-web/
     └── app.js                 # SPA router + all page rendering functions
 ```
 
-**Total:** 6 source files, ~2,100 lines of code.
+**Total:** 6 source files, ~2,400 lines of code.
 
 ---
 
@@ -98,7 +98,7 @@ dealengine-web/
 
 The SPA shell. Contains:
 
-- Top navigation bar with links to Dashboard, Buyers, Call List, Properties, Contacts, Activity Log
+- Top navigation bar with links to Dashboard, Buyers, Properties, Contacts, Activity Log
 - Quick-add buttons (+Buyer, +Property, +Log Activity)
 - Sign Out button
 - The `#app` container div where all pages render dynamically
@@ -173,11 +173,17 @@ Supabase client initialization and shared utility functions. Contains:
 - `sortTable(tableId, col, type)` — sorts rows by data attributes, toggles asc/desc
 - `updateSortIndicators(tableId)` — shows ▲/▼ arrow on active sort column
 
-### `js/app.js` (~1,770 lines)
+### `js/app.js` (~1,830 lines)
 
-The core application. Contains the SPA router and every page's render function.
+The core application. Contains the SPA router, data cache, and every page's render function.
 
-**Router (lines 1-47):**
+**Data Cache:**
+- `_cache` object stores fetched data per section (buyers, properties, contacts, buyerActivities)
+- `invalidateCache(key)` clears a specific cache key; called after any mutation (save, delete, import, activity log)
+- List pages check `_cache` before fetching — if data exists, it renders instantly without a Supabase round-trip
+- Filter clicks, status button clicks, and tab switching all reuse cached data
+
+**Router (lines 1-50):**
 - `navigate(path)` — pushes to history and routes
 - `route(path)` — pattern-matches the URL and calls the appropriate render function
 - Click interceptor — catches all internal link clicks and routes them through the SPA
@@ -192,7 +198,8 @@ The core application. Contains the SPA router and every page's render function.
 - Renders stat cards, follow-up table, and recent activity table
 
 **Buyers — 5 functions:**
-- `renderBuyersList(params)` — list view with search/filter by status, strategy, zip, import batch. Sortable columns. Portfolio tier column with color-coded badges.
+- `renderBuyersList(params)` — list view with status filter buttons (color-coded pills with counts), search, strategy/zip/batch filters. Uses `_cache.buyers` for instant filtering. Sortable columns. Portfolio tier column with color-coded badges.
+- `filterBuyerStatus(status)` — navigates with status param, reuses cached data (no re-fetch).
 - `renderBuyerForm(id)` — add/edit form with all buyer fields including portfolio_tier dropdown
 - `saveBuyer(action)` — insert or update buyer record
 - `deleteBuyer(id)` — delete with confirmation, also removes related activity logs
@@ -205,7 +212,10 @@ The core application. Contains the SPA router and every page's render function.
 - `toggleAllPropStreamBuyer(checked)` — select/deselect all checkboxes
 
 **Call List — `renderCallList(params)`:**
-- Dedicated outreach page at `/buyers/calllist`
+- Dedicated outreach page at `/buyers/calllist` (accessed from Buyers list, not in main nav)
+- Uses `_cache.buyers` and `_cache.buyerActivities` for instant filtering
+- Status filter buttons (color-coded pills with counts) for callable statuses only
+- `filterCallListStatus(status)` — navigates with status param, reuses cached data
 - Filters to only callable buyers (have non-DNC phone, not inactive/not_investor)
 - Shows outreach sequence step per buyer (Day 1 Call → Day 3 Text → Day 7 Call → Day 14 Text)
 - Sortable by name, portfolio tier, sequence step, status
@@ -276,8 +286,9 @@ When logging activity for a new/contacted buyer, the form shows:
 
 ### Buyer Management
 - Full CRUD (create, read, update, delete)
+- **Status filter buttons** — color-coded pill buttons with live counts per status, always visible above filters. Clicking filters instantly (cached, no re-fetch).
 - Search by name or email
-- Filter by status, strategy, zip code, import batch
+- Filter by strategy, zip code, import batch
 - Sortable columns (name, portfolio, status, strategy, price, condition, funding, POF, deals, follow-up, import batch)
 - Tracks: name, entity, phone, phone_alt, dnc_phones, email, source, target zips, price range, property types, condition tolerance, strategy, funding method, POF status, deal count, portfolio tier, property address, preferred contact method, notes, import batch
 - Detail page shows all matching properties and activity history
@@ -285,7 +296,8 @@ When logging activity for a new/contacted buyer, the form shows:
 - PropStream CSV import with preview, deduplication, and batch tagging
 
 ### Call List
-- Dedicated outreach page filtered to callable buyers only
+- Dedicated outreach page accessed from Buyers list (not in main nav)
+- **Status filter buttons** — color-coded pill buttons with live counts for callable statuses
 - Excludes inactive and not_investor status buyers
 - Shows outreach sequence progress per buyer
 - Copy-to-clipboard buttons for phone numbers and property addresses
@@ -348,6 +360,13 @@ When logging activity for a new/contacted buyer, the form shows:
 - Small ▲/▼ arrow shows current sort direction
 - Numeric, date, and string sort types supported
 - Sort happens instantly in-browser (no re-fetch)
+
+### Data Caching
+- List pages (Buyers, Properties, Contacts, Call List) cache fetched data in memory
+- Status button clicks, filter changes, and tab switching reuse cached data — no Supabase round-trip
+- Cache is automatically invalidated after any mutation: save, delete, import, batch rename/delete, activity log
+- The `_cache` object lives at the top of app.js; `invalidateCache(key)` clears a specific key
+- "Loading…" spinner only appears on first visit or after a mutation
 
 ### CSV Export
 - Available on Buyers, Properties, and Contacts list pages
