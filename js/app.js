@@ -31,6 +31,7 @@ function route(path) {
     if (p === '/' || p === '') { setActiveNav(''); renderDashboard(); }
     else if (p === '/buyers' && !params.has('id')) { setActiveNav('buyers'); renderBuyersList(params); }
     else if (p === '/buyers/new') { setActiveNav('buyers'); renderBuyerForm(); }
+    else if (p === '/buyers/calllist') { setActiveNav('buyers'); renderCallList(params); }
     else if (p.match(/^\/buyers\/(\d+)\/edit$/)) { setActiveNav('buyers'); renderBuyerForm(p.match(/(\d+)/)[1]); }
     else if (p.match(/^\/buyers\/(\d+)$/)) { setActiveNav('buyers'); renderBuyerDetail(p.match(/(\d+)/)[1]); }
     else if (p === '/properties') { setActiveNav('properties'); renderPropertiesList(params); }
@@ -147,6 +148,7 @@ async function renderBuyersList(params) {
     <div class="flex justify-between items-center mb-2">
       <h1 style="font-size:20px;font-weight:700;">Buyers</h1>
       <div class="flex gap-2">
+        <a href="/buyers/calllist" class="btn btn-sm" style="background:rgba(52,211,153,.15);border-color:var(--green);color:var(--green);">📞 Call List</a>
         <button class="btn btn-sm" onclick="exportBuyers()">Export CSV</button>
         <button class="btn btn-sm" onclick="document.getElementById('propstream-buyer-file').click()" style="background:var(--orange);border-color:var(--orange);color:#fff;">Import PropStream</button>
         <input type="file" id="propstream-buyer-file" accept=".csv" style="display:none" onchange="handlePropStreamBuyerImport(this)">
@@ -234,7 +236,10 @@ function showPropStreamBuyerPreview(owners, batchName) {
             name: o.name,
             entity_name: o.name.toLowerCase().includes('llc') || o.name.toLowerCase().includes('inc') || o.name.toLowerCase().includes('trust') ? o.name : null,
             phone: o.phones[0] || null,
+            phone_alt: o.phones.slice(1).join(',') || null,
+            dnc_phones: o.dncPhones.join(',') || null,
             email: o.emails[0] || null,
+            property_address: o.addresses[0] || null,
             notes: noteParts.join('\n'),
             portfolioTier: o.portfolioTier,
         };
@@ -294,7 +299,10 @@ window.confirmPropStreamBuyerImport = async () => {
         name: buyers[i].name,
         entity_name: buyers[i].entity_name,
         phone: buyers[i].phone,
+        phone_alt: buyers[i].phone_alt,
+        dnc_phones: buyers[i].dnc_phones,
         email: buyers[i].email,
+        property_address: buyers[i].property_address,
         source: 'public_records',
         status: 'new',
         preferred_contact: 'call',
@@ -318,6 +326,139 @@ window.confirmPropStreamBuyerImport = async () => {
     if (errors) flash(`Imported ${inserted} buyers (${errors} chunk(s) had errors)`, 'error');
     else flash(`Imported ${inserted} buyers from PropStream → "${batchName}"`);
     navigate('/buyers?batch=' + encodeURIComponent(batchName));
+};
+
+// ── Call List ───────────────────────────────────────────────────────────────
+async function renderCallList(params) {
+    app.innerHTML = '<div class="loading">Loading call list…</div>';
+    const [{ data: buyers }, { data: activities }] = await Promise.all([
+        db.from('buyers').select('*').order('name'),
+        db.from('activity_log').select('*').eq('contact_type', 'buyer').order('created_at', { ascending: false })
+    ]);
+
+    let filtered = (buyers || []).filter(b => {
+        // Only show callable buyers: have at least one non-DNC phone, and not inactive/not_investor
+        if (['inactive', 'not_investor'].includes(b.status)) return false;
+        if (!b.phone) return false;
+        return true;
+    });
+
+    const batch = params?.get('batch');
+    const status = params?.get('status');
+    const tier = params?.get('tier');
+    if (batch) filtered = filtered.filter(b => b.import_batch === batch);
+    if (status) filtered = filtered.filter(b => b.status === status);
+    if (tier) filtered = filtered.filter(b => b.portfolio_tier === tier);
+
+    const batches = [...new Set((buyers || []).map(b => b.import_batch).filter(Boolean))].sort();
+    const tiers = [...new Set((buyers || []).map(b => b.portfolio_tier).filter(Boolean))].sort((a, b) => (parseInt(a)||0) - (parseInt(b)||0));
+
+    // Build activity count per buyer for sequence tracking
+    const activityMap = {};
+    (activities || []).forEach(a => {
+        if (!activityMap[a.contact_id]) activityMap[a.contact_id] = { calls: 0, texts: 0, last: null };
+        const m = activityMap[a.contact_id];
+        if (a.activity_type === 'call') m.calls++;
+        if (a.activity_type === 'text') m.texts++;
+        if (!m.last || a.created_at > m.last) m.last = a.created_at;
+    });
+
+    // Sort: prioritize by sequence step (fewer touches first), then by portfolio tier descending
+    filtered.sort((a, b) => {
+        const aAct = activityMap[a.id] || { calls: 0, texts: 0 };
+        const bAct = activityMap[b.id] || { calls: 0, texts: 0 };
+        const aTouches = aAct.calls + aAct.texts;
+        const bTouches = bAct.calls + bAct.texts;
+        if (aTouches !== bTouches) return aTouches - bTouches;
+        const aTier = parseInt(a.portfolio_tier) || 0;
+        const bTier = parseInt(b.portfolio_tier) || 0;
+        return bTier - aTier;
+    });
+
+    // Determine next step label for each buyer
+    function seqLabel(buyerId) {
+        const a = activityMap[buyerId] || { calls: 0, texts: 0 };
+        if (a.calls === 0) return { label: 'Day 1: Call', color: 'blue' };
+        if (a.texts === 0) return { label: 'Day 3: Text', color: 'blue' };
+        if (a.calls === 1) return { label: 'Day 7: Call #2', color: 'yellow' };
+        if (a.texts === 1) return { label: 'Day 14: Final Text', color: 'orange' };
+        return { label: 'Sequence done', color: 'gray' };
+    }
+
+    app.innerHTML = `
+    <div class="flex justify-between items-center mb-2">
+      <h1 style="font-size:20px;font-weight:700;">📞 Call List</h1>
+      <div class="flex gap-2">
+        <a href="/buyers" class="btn btn-sm">← Back to Buyers</a>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div class="text-sm text-muted">
+        Showing <strong style="color:var(--text)">${filtered.length}</strong> callable buyers (have a non-DNC phone, not inactive/not investor).
+        Sorted by outreach progress then portfolio size. Click a row's phone to copy, address to copy for PropStream lookup.
+      </div>
+    </div>
+    <div class="filters">
+      <select id="cl-status"><option value="">All Status</option>${['new','contacted','criteria_collected','engaged','verified_active'].map(s=>`<option value="${s}" ${status===s?'selected':''}>${s.replace(/_/g,' ')}</option>`).join('')}</select>
+      ${batches.length ? `<select id="cl-batch"><option value="">All Imports</option>${batches.map(b=>`<option value="${b}" ${batch===b?'selected':''}>${b}</option>`).join('')}</select>` : ''}
+      ${tiers.length ? `<select id="cl-tier"><option value="">All Tiers</option>${tiers.map(t=>`<option value="${t}" ${tier===t?'selected':''}>${t} properties</option>`).join('')}</select>` : ''}
+      <button class="btn btn-sm" onclick="filterCallList()">Filter</button>
+      <a href="/buyers/calllist" class="btn btn-sm">Clear</a>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto;"><table id="tbl-calllist">
+      <tr>
+        <th data-sort="Name">Name</th>
+        <th data-sort="Tier" data-type="number">Portfolio</th>
+        <th data-sort="Step">Next Step</th>
+        <th>Callable Phones</th>
+        <th>DNC Phones</th>
+        <th>Address (for PropStream)</th>
+        <th data-sort="Status">Status</th>
+        <th></th>
+      </tr>
+      ${filtered.map(b => {
+        const seq = seqLabel(b.id);
+        const allPhones = [b.phone, ...(b.phone_alt || '').split(',')].filter(Boolean);
+        const dncList = (b.dnc_phones || '').split(',').filter(Boolean);
+        const addr = b.property_address || '';
+        return `<tr data-row data-sortName="${(b.name||'').replace(/"/g,'&quot;')}" data-sortTier="${parseInt(b.portfolio_tier)||0}" data-sortStep="${seq.label}" data-sortStatus="${b.status||''}">
+          <td>
+            <a href="/buyers/${b.id}"><strong>${b.name}</strong></a>
+            ${b.entity_name ? `<br><span class="text-muted text-sm">${b.entity_name}</span>` : ''}
+          </td>
+          <td>${b.portfolio_tier ? badge(b.portfolio_tier, tierColor(b.portfolio_tier)) : ''}</td>
+          <td>${badge(seq.label, seq.color)}</td>
+          <td>
+            ${allPhones.map(p => `<span class="btn btn-sm" style="margin:1px;cursor:pointer;font-variant-numeric:tabular-nums;" onclick="copyText('${p}');flash('Copied ${p}')">📋 ${p}</span>`).join('<br>')}
+          </td>
+          <td class="text-sm" style="color:var(--red);">
+            ${dncList.length ? dncList.join(', ') : '<span class="text-muted">none</span>'}
+          </td>
+          <td>
+            ${addr ? `<span class="btn btn-sm" style="cursor:pointer;" onclick="copyText('${addr.replace(/'/g,"\\'")}');flash('Address copied')">📋 ${addr}</span>` : '<span class="text-muted text-sm">—</span>'}
+          </td>
+          <td>${badge(b.status, buyerStatusColor(b.status))}</td>
+          <td>
+            <a href="/activities/new?contact_type=buyer&contact_id=${b.id}" class="btn btn-sm btn-primary">Log Call</a>
+          </td>
+        </tr>`;
+      }).join('')}
+      ${filtered.length === 0 ? '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:24px;">No callable buyers found.</td></tr>' : ''}
+    </table></div>`;
+
+    setTimeout(() => makeSortable('tbl-calllist'), 0);
+}
+
+window.copyText = (text) => {
+    navigator.clipboard.writeText(text);
+};
+
+window.filterCallList = () => {
+    const params = new URLSearchParams();
+    const st = document.getElementById('cl-status')?.value; if (st) params.set('status', st);
+    const b = document.getElementById('cl-batch')?.value; if (b) params.set('batch', b);
+    const t = document.getElementById('cl-tier')?.value; if (t) params.set('tier', t);
+    navigate('/buyers/calllist' + (params.toString() ? '?' + params : ''));
 };
 
 // ── Buyer Form ──────────────────────────────────────────────────────────────
@@ -445,6 +586,9 @@ async function renderBuyerDetail(id) {
       <div class="field"><div class="label">POF Verified</div><div class="value">${buyer.proof_of_funds_verified ? '✓ Yes' : '✗ No'}</div></div>
       <div class="field"><div class="label">Deals (12mo)</div><div class="value">${buyer.deals_last_12_months}</div></div>
       <div class="field"><div class="label">Portfolio Tier</div><div class="value">${buyer.portfolio_tier ? badge(buyer.portfolio_tier + ' properties', tierColor(buyer.portfolio_tier)) : '—'}</div></div>
+      <div class="field"><div class="label">Property Address</div><div class="value">${buyer.property_address || '—'}</div></div>
+      ${(buyer.phone_alt) ? `<div class="field"><div class="label">Other Phones</div><div class="value">${buyer.phone_alt.split(',').join(', ')}</div></div>` : ''}
+      ${(buyer.dnc_phones) ? `<div class="field"><div class="label">DNC Phones</div><div class="value" style="color:var(--red)">${buyer.dnc_phones.split(',').join(', ')}</div></div>` : ''}
     </div>
     ${buyer.notes ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);"><div class="label text-sm">NOTES</div><div>${buyer.notes}</div></div>` : ''}
     </div>
