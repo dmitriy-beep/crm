@@ -57,9 +57,9 @@ async function renderDashboard() {
     const todayStr = today();
 
     const [{ data: buyers }, { data: properties }, { data: contacts }, { data: activities }] = await Promise.all([
-        db.from('buyers').select('*'),
-        db.from('properties').select('*'),
-        db.from('contacts').select('*'),
+        db.from('buyers').select('*').limit(10000),
+        db.from('properties').select('*').limit(10000),
+        db.from('contacts').select('*').limit(10000),
         db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20)
     ]);
 
@@ -125,7 +125,7 @@ async function renderDashboard() {
 async function renderBuyersList(params) {
     if (!_cache.buyers) {
         app.innerHTML = '<div class="loading">Loading buyers…</div>';
-        const { data: buyers } = await db.from('buyers').select('*').order('name');
+        const { data: buyers } = await db.from('buyers').select('*').order('name').limit(10000);
         _cache.buyers = buyers || [];
     }
     const buyers = _cache.buyers;
@@ -230,7 +230,7 @@ window.filterBuyerStatus = (status) => {
 };
 
 window.exportBuyers = async () => {
-    const { data } = await db.from('buyers').select('*').order('name');
+    const { data } = await db.from('buyers').select('*').order('name').limit(10000);
     if (data) exportCSV(data, 'buyers.csv');
 };
 
@@ -363,8 +363,8 @@ async function renderCallList(params) {
     if (!_cache.buyers || !_cache.buyerActivities) {
         app.innerHTML = '<div class="loading">Loading call list…</div>';
         const [{ data: buyers }, { data: activities }] = await Promise.all([
-            db.from('buyers').select('*').order('name'),
-            db.from('activity_log').select('*').eq('contact_type', 'buyer').order('created_at', { ascending: false })
+            db.from('buyers').select('*').order('name').limit(10000),
+            db.from('activity_log').select('*').eq('contact_type', 'buyer').order('created_at', { ascending: false }).limit(10000)
         ]);
         _cache.buyers = buyers || [];
         _cache.buyerActivities = activities || [];
@@ -619,8 +619,8 @@ async function renderBuyerDetail(id) {
     app.innerHTML = '<div class="loading">Loading…</div>';
     const [{ data: buyer }, { data: allProps }, { data: activities }] = await Promise.all([
         db.from('buyers').select('*').eq('id', id).single(),
-        db.from('properties').select('*'),
-        db.from('activity_log').select('*').eq('contact_type', 'buyer').eq('contact_id', id).order('created_at', { ascending: false })
+        db.from('properties').select('*').limit(10000),
+        db.from('activity_log').select('*').eq('contact_type', 'buyer').eq('contact_id', id).order('created_at', { ascending: false }).limit(10000)
     ]);
 
     if (!buyer) { flash('Buyer not found', 'error'); navigate('/buyers'); return; }
@@ -689,8 +689,8 @@ async function renderPropertiesList(params) {
     if (!_cache.properties || !_cache.buyers) {
         app.innerHTML = '<div class="loading">Loading properties…</div>';
         const [{ data: properties }, { data: allBuyers }] = await Promise.all([
-            db.from('properties').select('*').order('created_at', { ascending: false }),
-            db.from('buyers').select('*')
+            db.from('properties').select('*').order('created_at', { ascending: false }).limit(10000),
+            db.from('buyers').select('*').limit(10000)
         ]);
         _cache.properties = properties || [];
         _cache.buyers = allBuyers || [];
@@ -769,7 +769,7 @@ window.filterProps = () => {
 };
 
 window.exportProperties = async () => {
-    const { data } = await db.from('properties').select('*');
+    const { data } = await db.from('properties').select('*').limit(10000);
     if (data) exportCSV(data, 'properties.csv');
 };
 
@@ -904,8 +904,8 @@ async function renderPropertyDetail(id) {
     app.innerHTML = '<div class="loading">Loading…</div>';
     const [{ data: prop }, { data: allBuyers }, { data: activities }] = await Promise.all([
         db.from('properties').select('*').eq('id', id).single(),
-        db.from('buyers').select('*'),
-        db.from('activity_log').select('*').order('created_at', { ascending: false })
+        db.from('buyers').select('*').limit(10000),
+        db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(10000)
     ]);
 
     if (!prop) { flash('Property not found', 'error'); navigate('/properties'); return; }
@@ -982,7 +982,7 @@ async function renderPropertyDetail(id) {
 async function renderContactsList(params) {
     if (!_cache.contacts) {
         app.innerHTML = '<div class="loading">Loading contacts…</div>';
-        const { data: contacts } = await db.from('contacts').select('*').order('name');
+        const { data: contacts } = await db.from('contacts').select('*').order('name').limit(10000);
         _cache.contacts = contacts || [];
     }
     const contacts = _cache.contacts;
@@ -1039,7 +1039,7 @@ window.filterContacts = () => {
     navigate('/contacts' + (params.toString() ? '?' + params : ''));
 };
 window.exportContacts = async () => {
-    const { data } = await db.from('contacts').select('*');
+    const { data } = await db.from('contacts').select('*').limit(10000);
     if (data) exportCSV(data, 'contacts.csv');
 };
 
@@ -1356,7 +1356,7 @@ async function renderContactDetail(id) {
     app.innerHTML = '<div class="loading">Loading…</div>';
     const [{ data: contact }, { data: activities }] = await Promise.all([
         db.from('contacts').select('*').eq('id', id).single(),
-        db.from('activity_log').select('*').in('contact_type', ['listing_agent','other']).eq('contact_id', id).order('created_at', { ascending: false })
+        db.from('activity_log').select('*').in('contact_type', ['listing_agent','other']).eq('contact_id', id).order('created_at', { ascending: false }).limit(10000)
     ]);
     if (!contact) { flash('Contact not found','error'); navigate('/contacts'); return; }
 
@@ -1388,8 +1388,8 @@ async function renderActivitiesList(params) {
     app.innerHTML = '<div class="loading">Loading activities…</div>';
     const [{ data: activities }, { data: buyers }, { data: contacts }] = await Promise.all([
         db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(100),
-        db.from('buyers').select('id,name'),
-        db.from('contacts').select('id,name')
+        db.from('buyers').select('id,name').limit(10000),
+        db.from('contacts').select('id,name').limit(10000)
     ]);
 
     let filtered = activities || [];
@@ -1443,9 +1443,9 @@ window.filterActs = () => {
 // ── Activity Form ───────────────────────────────────────────────────────────
 async function renderActivityForm(params) {
     const [{ data: buyers }, { data: contacts }, { data: allActivities }] = await Promise.all([
-        db.from('buyers').select('*').order('name'),
-        db.from('contacts').select('id,name,role').order('name'),
-        db.from('activity_log').select('*').order('created_at', { ascending: false })
+        db.from('buyers').select('*').order('name').limit(10000),
+        db.from('contacts').select('id,name,role').order('name').limit(10000),
+        db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(10000)
     ]);
 
     const preType = params?.get('contact_type') || '';
