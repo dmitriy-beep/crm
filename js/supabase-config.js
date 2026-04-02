@@ -258,8 +258,9 @@ function sortTable(tableId, col, type) {
     _sortState[tableId] = state;
 
     rows.sort((a, b) => {
-        let va = a.dataset['sort' + col] ?? '';
-        let vb = b.dataset['sort' + col] ?? '';
+        const key = ('sort' + col).toLowerCase();
+        let va = a.dataset[key] ?? '';
+        let vb = b.dataset[key] ?? '';
 
         if (type === 'number') {
             va = parseFloat(va) || 0;

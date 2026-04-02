@@ -88,17 +88,17 @@ dealengine-web/
     └── app.js                 # SPA router + all page rendering functions
 ```
 
-**Total:** 6 source files, ~1,400 lines of code.
+**Total:** 6 source files, ~2,100 lines of code.
 
 ---
 
 ## File Reference
 
-### `index.html` (34 lines)
+### `index.html` (35 lines)
 
 The SPA shell. Contains:
 
-- Top navigation bar with links to Dashboard, Buyers, Properties, Contacts, Activity Log
+- Top navigation bar with links to Dashboard, Buyers, Call List, Properties, Contacts, Activity Log
 - Quick-add buttons (+Buyer, +Property, +Log Activity)
 - Sign Out button
 - The `#app` container div where all pages render dynamically
@@ -106,13 +106,14 @@ The SPA shell. Contains:
 
 This file never changes between page navigations. The `#app` div's innerHTML gets replaced by JavaScript.
 
-### `css/style.css` (117 lines)
+### `css/style.css` (~120 lines)
 
 Complete dark-theme stylesheet. Defines:
 
 - CSS custom properties (colors, border radius) in `:root`
 - Layout: topbar (sticky), container (max-width 1280px)
 - Components: cards, stat boxes, tables, badges, buttons, forms, filters
+- Sortable table headers (cursor, hover color, arrow indicators)
 - Utility classes: text-muted, money formatting, flex helpers
 - Flash messages with auto-fade animation
 - Detail page layouts (header, grid, section titles)
@@ -134,7 +135,7 @@ Color palette:
 | --red     | #f87171   | Danger, negative spread      |
 | --orange  | #fb923c   | Contact role badges          |
 
-### `js/supabase-config.js` (207 lines)
+### `js/supabase-config.js` (~290 lines)
 
 Supabase client initialization and shared utility functions. Contains:
 
@@ -152,13 +153,14 @@ Supabase client initialization and shared utility functions. Contains:
 - `badge(text, color)` — generates badge HTML with appropriate color class
 - `buyerStatusColor(s)` — returns badge color based on buyer status
 - `propStatusColor(s)` — returns badge color based on property status
+- `tierColor(tier)` — returns badge color based on portfolio tier (blue=1-5, yellow=6-10, orange=11-19, red=20+)
 - `today()` — returns current date as YYYY-MM-DD
 - `flash(msg, type)` — shows a flash message at top of page that auto-fades
 - `exportCSV(data, filename)` — converts array of objects to CSV and triggers download
 
 **Matching Logic:**
-- `getMatchingBuyers(property, buyers)` — given a property and all buyers, returns filtered/sorted matches
-- `getMatchingProperties(buyer, properties)` — given a buyer and all properties, returns filtered/sorted matches
+- `getMatchingBuyers(property, buyers)` — given a property and all buyers, returns filtered/sorted matches. Skips inactive, not_investor, and buyers with incomplete criteria.
+- `getMatchingProperties(buyer, properties)` — given a buyer and all properties, returns filtered/sorted matches. Returns empty if buyer criteria are incomplete.
 
 **Authentication:**
 - `checkAuth()` — checks for existing Supabase session; shows login form if none
@@ -166,77 +168,99 @@ Supabase client initialization and shared utility functions. Contains:
 - `handleLogin(e)` — processes login form submission via Supabase Auth
 - `signOut()` — signs out and shows login form
 
-### `js/app.js` (911 lines)
+**Sortable Tables:**
+- `makeSortable(tableId)` — attaches click handlers to `th[data-sort]` headers
+- `sortTable(tableId, col, type)` — sorts rows by data attributes, toggles asc/desc
+- `updateSortIndicators(tableId)` — shows ▲/▼ arrow on active sort column
+
+### `js/app.js` (~1,770 lines)
 
 The core application. Contains the SPA router and every page's render function.
 
-**Router (lines 1-46):**
+**Router (lines 1-47):**
 - `navigate(path)` — pushes to history and routes
 - `route(path)` — pattern-matches the URL and calls the appropriate render function
 - Click interceptor — catches all internal link clicks and routes them through the SPA
 - `setActiveNav(page)` — highlights the current page in the topbar
 - `popstate` listener — handles browser back/forward buttons
 
-**Dashboard — `renderDashboard()` (lines 48-100):**
+**Dashboard — `renderDashboard()`:**
 - Fetches all buyers, properties, contacts, and recent activities in parallel
 - Calculates follow-ups due (today or overdue) from buyers and contacts
 - Aggregates counts by status for buyers and properties
 - Counts activities from the past 7 days
 - Renders stat cards, follow-up table, and recent activity table
 
-**Buyers — 5 functions (lines 102-290):**
-- `renderBuyersList(params)` — list view with search/filter by status, strategy, zip
-- `renderBuyerForm(id)` — add/edit form with all buyer fields
+**Buyers — 5 functions:**
+- `renderBuyersList(params)` — list view with search/filter by status, strategy, zip, import batch. Sortable columns. Portfolio tier column with color-coded badges.
+- `renderBuyerForm(id)` — add/edit form with all buyer fields including portfolio_tier dropdown
 - `saveBuyer(action)` — insert or update buyer record
 - `deleteBuyer(id)` — delete with confirmation, also removes related activity logs
-- `renderBuyerDetail(id)` — full detail view showing buyer info, matching properties, activity history
+- `renderBuyerDetail(id)` — full detail view showing buyer info (including portfolio tier, property address, DNC phones, alt phones), matching properties, activity history
 
-**Properties — 5 functions (lines 292-580):**
-- `renderPropertiesList(params)` — list view with search/filter by status, condition, zip, price, DOM
+**PropStream Buyer Import — 4 functions:**
+- `handlePropStreamBuyerImport(input)` — reads CSV file, extracts batch name from filename
+- `showPropStreamBuyerPreview(owners, batchName)` — preview table with checkboxes, portfolio tier badges
+- `confirmPropStreamBuyerImport()` — batch inserts selected buyers with import_batch tag
+- `toggleAllPropStreamBuyer(checked)` — select/deselect all checkboxes
+
+**Call List — `renderCallList(params)`:**
+- Dedicated outreach page at `/buyers/calllist`
+- Filters to only callable buyers (have non-DNC phone, not inactive/not_investor)
+- Shows outreach sequence step per buyer (Day 1 Call → Day 3 Text → Day 7 Call → Day 14 Text)
+- Sortable by name, portfolio tier, sequence step, status
+- Each row has: copy-phone buttons, DNC phones in red, copy-address button for PropStream lookup, "Log Call" button linking to activity form
+- Sorted by outreach progress (fewer touches first) then portfolio tier descending
+- Filterable by status, import batch, portfolio tier
+
+**Properties — 5 functions:**
+- `renderPropertiesList(params)` — list view with search/filter by status, condition, zip, price, DOM. Sortable columns.
 - `renderPropertyForm(id)` — add/edit form with auto-calculating MAO and ADU fields
 - `saveProperty(action)` — insert or update with calculated MAO and ADU
 - `deleteProperty(id)` — delete with confirmation
 - `renderPropertyDetail(id)` — full detail view with stat cards (price, MAO, spread, DOM), matching buyers, activity history
 
-**Contacts — 4 functions (lines 582-660):**
-- `renderContactsList(params)` — list view with search/filter by role
+**Contacts — 4 functions:**
+- `renderContactsList(params)` — list view with search/filter by role, import batch. Sortable columns.
 - `renderContactForm(id)` — add/edit form
 - `saveContact(action)` — insert or update
 - `deleteContact(id)` — delete with confirmation
 
-**Activities — 3 functions (lines 662-910):**
-- `renderActivitiesList(params)` — list view with filter by contact type and activity type
-- `renderActivityForm(params)` — quick-log form with dynamic contact dropdown (changes based on contact type selection)
-- `saveActivity(action)` — insert activity and auto-update last_contacted/next_followup on the related buyer or contact
+**PropStream Contact Import — 4 functions:**
+- `handlePropStreamImport(input)` — reads CSV, extracts batch name
+- `showPropStreamPreview(owners, batchName)` — preview with portfolio tier badges
+- `confirmPropStreamImport()` — batch inserts with import_batch tag
+- `toggleAllPropStream(checked)` — select/deselect all
 
-**Global window functions:** All button handlers (delete, filter, export, save, calcMAO, etc.) are attached to `window` so they're accessible from inline `onclick` attributes in rendered HTML.
+**Shared CSV Parser — `parsePropStreamCSV(text)`:**
+- Handles quoted and unquoted CSV fields
+- Groups rows by owner name (Company Name or First+Last)
+- Collects all unique phones (split into DNC and non-DNC), emails, property addresses
+- Reads Portfolio Tier column
+- Returns deduplicated array of owner objects
 
-### `schema.sql` (134 lines)
+**Batch Management — 2 functions:**
+- `renameBatch(table, oldName)` — prompts for new name, updates all records in batch
+- `deleteBatch(table, batchName)` — deletes all records in batch (with activity log cleanup for buyers)
 
-Complete PostgreSQL schema for Supabase. Run once via the SQL Editor. Contains:
+**Activities — 3 functions:**
+- `renderActivitiesList(params)` — list view with filter by contact type and activity type. Sortable columns.
+- `renderActivityForm(params)` — outreach sequence tracker with quick-action buttons (see below)
+- `saveActivity(action)` — insert activity, update buyer status/criteria/follow-up, structured description with outcome/classification/engagement
 
-1. **DROP statements** — wipes existing tables (safe reset)
-2. **CREATE TABLE** — all 4 tables with constraints and CHECK clauses
-3. **Row Level Security** — enabled on all tables with policies restricting access to authenticated users only
-4. **Seed data** — 5 sample buyers, 5 sample properties, 4 contacts, 4 activity log entries
+**Outreach Sequence Tracker (in renderActivityForm):**
+When logging activity for a new/contacted buyer, the form shows:
+- 4-step progress bar showing where the buyer is in the outreach sequence
+- Context-aware quick action buttons:
+  - Call steps: Voicemail, Callback Requested
+  - Text steps: Send Text (with copyable template)
+  - All steps: Conversation Hot (opens criteria panel), Conversation Warm, Not Interested, Not Investor, Wrong Number
+- Structured logging fields: Call Outcome, Contact Classification, Engagement Level
+- Criteria panel for collecting buy criteria inline during hot conversations
+- Auto-sets follow-up dates based on sequence position
+- Text templates with buyer's first name for Day 3 and Day 14
 
-### `_redirects` (1 line)
-
-Cloudflare Pages routing rule:
-
-```
-/*    /index.html    200
-```
-
-This tells Cloudflare to serve `index.html` for every URL path (with a 200 status, not a redirect). Required for SPA routing — without this, navigating directly to `/buyers/3` would return a 404 because there's no `buyers/3/index.html` file.
-
-### `_headers` (4 lines)
-
-Security headers applied to all responses:
-
-- `X-Frame-Options: DENY` — prevents the site from being embedded in iframes (clickjacking protection)
-- `X-Content-Type-Options: nosniff` — prevents MIME type sniffing
-- `Referrer-Policy: strict-origin-when-cross-origin` — limits referrer information sent to other domains
+**Global window functions:** All button handlers (delete, filter, export, save, calcMAO, quickAction, copyText, etc.) are attached to `window` so they're accessible from inline `onclick` attributes in rendered HTML.
 
 ---
 
@@ -253,10 +277,22 @@ Security headers applied to all responses:
 ### Buyer Management
 - Full CRUD (create, read, update, delete)
 - Search by name or email
-- Filter by status, strategy, zip code
-- Tracks: name, entity, phone, email, source, target zips, price range, property types, condition tolerance, strategy, funding method, POF status, deal count, preferred contact method, notes
+- Filter by status, strategy, zip code, import batch
+- Sortable columns (name, portfolio, status, strategy, price, condition, funding, POF, deals, follow-up, import batch)
+- Tracks: name, entity, phone, phone_alt, dnc_phones, email, source, target zips, price range, property types, condition tolerance, strategy, funding method, POF status, deal count, portfolio tier, property address, preferred contact method, notes, import batch
 - Detail page shows all matching properties and activity history
 - Edit and Delete buttons directly on list rows
+- PropStream CSV import with preview, deduplication, and batch tagging
+
+### Call List
+- Dedicated outreach page filtered to callable buyers only
+- Excludes inactive and not_investor status buyers
+- Shows outreach sequence progress per buyer
+- Copy-to-clipboard buttons for phone numbers and property addresses
+- DNC phones shown in red for reference
+- Direct "Log Call" button per buyer linking to activity form
+- Sorted by outreach progress then portfolio tier
+- Filterable by status, import batch, portfolio tier
 
 ### Property Management
 - Full CRUD with auto-calculated fields
@@ -264,6 +300,7 @@ Security headers applied to all responses:
 - **ADU potential auto-flags** when lot > 5,000 sqft and property type is SFR
 - Search by address
 - Filter by status, condition, zip, max price, min DOM
+- Sortable columns (address, price, MAO, spread, DOM, beds, sqft, type, condition, status, matches)
 - DOM indicator: 🔥 appears when DOM exceeds 60 days
 - Spread calculation shows if the property is above or below MAO (green = below = good deal)
 - Detail page shows stat cards, matching buyers with contact info, and activity history
@@ -272,16 +309,45 @@ Security headers applied to all responses:
 ### Contact Management
 - Full CRUD for non-buyer contacts
 - Role categories: listing agent, contractor, attorney, property manager, title company, other
-- Filter by role
+- Filter by role and import batch
+- Sortable columns (name, role, company, follow-up, import batch)
 - Activity log per contact
+- PropStream CSV import with batch tagging
 
 ### Activity Logging
 - Quick-log form designed for speed (15-30 entries per day)
 - Select contact type → contact dropdown auto-populates
 - Activity types: call, text, email, meeting, offer submitted/accepted/rejected, note
-- Optional follow-up date with checkbox
+- **Outreach sequence tracker** for new/contacted buyers with 4-step progress bar
+- **Quick action buttons**: voicemail, callback, hot conversation, warm conversation, not interested, not investor, wrong number
+- **Structured fields**: call outcome, contact classification (investor/not investor), engagement level (hot/warm/cold)
+- **Criteria panel** appears on hot conversations for inline criteria collection
+- **Text templates** with buyer name for Day 3 intro and Day 14 final follow-up
+- Auto-updates `last_contacted`, `next_followup`, and `status` on the related buyer/contact
 - "Save & Log Another" button for batch entry
-- Auto-updates `last_contacted` and `next_followup` on the related buyer/contact when logging
+
+### PropStream Import
+- Available on both Buyers and Contacts list pages
+- Parses PropStream CSV format (quoted/unquoted headers, Phone 1-5 with DNC flags, Email 1-4, Portfolio Tier)
+- Deduplicates by owner name — same LLC with 3 properties becomes 1 record
+- Separates DNC phones from callable phones
+- Stores first property address for PropStream lookup
+- Preview table with checkboxes, portfolio tier badges, select/deselect all
+- Import batch tagged with CSV filename (minus .csv extension)
+- Batch management: filter, rename, delete entire batches
+
+### Import Batches
+- Every PropStream import is tagged with the CSV filename
+- Filter dropdown appears on Buyers/Contacts list when batches exist
+- When filtering by batch: Rename and Delete Batch buttons appear
+- Delete Batch removes all records in that batch (plus related activity logs for buyers)
+
+### Sortable Tables
+- All four list pages have clickable column headers
+- Click to sort ascending, click again for descending
+- Small ▲/▼ arrow shows current sort direction
+- Numeric, date, and string sort types supported
+- Sort happens instantly in-browser (no re-fetch)
 
 ### CSV Export
 - Available on Buyers, Properties, and Contacts list pages
@@ -301,10 +367,12 @@ The matching engine is the core feature. It runs client-side in JavaScript.
 
 ### A property matches a buyer when ALL of these are true:
 
-1. **Zip code** — the property's zip_code exists in the buyer's comma-separated zip_codes list
-2. **Price range** — the property's list_price OR mao falls between the buyer's min_price and max_price
-3. **Property type** — the property's type (sfr, multi, land, condo) exists in the buyer's property_types list
-4. **Condition tolerance** — the property's condition is equal to or BETTER than the buyer's tolerance
+1. **Buyer has complete criteria** — zip_codes, property_types, and condition_tolerance must all be non-null (unvetted imports are excluded)
+2. **Buyer is active** — status is not `inactive` or `not_investor`
+3. **Zip code** — the property's zip_code exists in the buyer's comma-separated zip_codes list
+4. **Price range** — the property's list_price OR mao falls between the buyer's min_price and max_price
+5. **Property type** — the property's type (sfr, multi, land, condo) exists in the buyer's property_types list
+6. **Condition tolerance** — the property's condition is equal to or BETTER than the buyer's tolerance
 
 ### Condition hierarchy (best to worst):
 
@@ -335,7 +403,9 @@ A buyer who tolerates `medium_rehab` will also match `turnkey` and `cosmetic` pr
 | id | BIGSERIAL | Primary key, auto-increment |
 | name | TEXT | Required |
 | entity_name | TEXT | LLC or trust name, nullable |
-| phone | TEXT | |
+| phone | TEXT | Primary non-DNC phone |
+| phone_alt | TEXT | Comma-separated additional non-DNC phones |
+| dnc_phones | TEXT | Comma-separated DNC phones (for reference, not calling) |
 | email | TEXT | |
 | source | TEXT | public_records, meetup, referral, online, other |
 | zip_codes | TEXT | Comma-separated: "95747,95678,95677" |
@@ -347,9 +417,12 @@ A buyer who tolerates `medium_rehab` will also match `turnkey` and `cosmetic` pr
 | funding_method | TEXT | cash, hard_money, conventional, private_money |
 | proof_of_funds_verified | BOOLEAN | Default false |
 | deals_last_12_months | INTEGER | Default 0 |
+| portfolio_tier | TEXT | PropStream portfolio size: "1-3", "4-5", "6-10", "11-19", "20-49", "50+" |
+| property_address | TEXT | First property address from PropStream (for lookup) |
 | preferred_contact | TEXT | call, text, email |
-| status | TEXT | new, contacted, criteria_collected, engaged, verified_active, inactive |
+| status | TEXT | new, contacted, criteria_collected, engaged, verified_active, not_investor, inactive |
 | notes | TEXT | Freeform |
+| import_batch | TEXT | CSV filename this buyer was imported from |
 | created_at | TIMESTAMPTZ | Auto-set on insert |
 | last_contacted | DATE | Updated automatically when activity is logged |
 | next_followup | DATE | Updated when activity with follow-up is logged |
@@ -399,6 +472,7 @@ A buyer who tolerates `medium_rehab` will also match `turnkey` and `cosmetic` pr
 | role | TEXT | listing_agent, contractor, attorney, property_manager, title_company, other |
 | company | TEXT | |
 | notes | TEXT | |
+| import_batch | TEXT | CSV filename this contact was imported from |
 | created_at | TIMESTAMPTZ | Auto-set |
 | last_contacted | DATE | |
 | next_followup | DATE | |
@@ -411,7 +485,7 @@ A buyer who tolerates `medium_rehab` will also match `turnkey` and `cosmetic` pr
 | contact_type | TEXT | buyer, listing_agent, seller, other |
 | contact_id | BIGINT | References buyer.id or contact.id depending on contact_type |
 | activity_type | TEXT | call, text, email, meeting, offer_submitted, offer_accepted, offer_rejected, note |
-| description | TEXT | What happened |
+| description | TEXT | What happened — includes structured prefix [Outcome: x | Type: x | Engagement: x] when logged via quick actions |
 | followup_needed | BOOLEAN | |
 | followup_date | DATE | |
 | created_at | TIMESTAMPTZ | Auto-set |
@@ -507,7 +581,7 @@ Cloudflare builds and deploys in approximately 15 seconds. No build step — it 
 
 ### Changing the matching logic
 
-Edit `getMatchingBuyers()` and `getMatchingProperties()` in `js/supabase-config.js`. Both functions take the full record and an array of candidates, filter them, and return sorted matches.
+Edit `getMatchingBuyers()` and `getMatchingProperties()` in `js/supabase-config.js`. Both functions take the full record and an array of candidates, filter them, and return sorted matches. Buyers with null zip_codes, property_types, or condition_tolerance are automatically skipped.
 
 ### Changing styles
 
@@ -553,3 +627,12 @@ Cloudflare may serve cached files. Hard refresh with Cmd+Shift+R, or purge the c
 
 **Login not working:**
 Verify the user exists in Supabase Dashboard → Authentication → Users. Check that the email is confirmed (Supabase may require email confirmation depending on settings — disable it in Authentication → Settings → Email Auth if needed).
+
+**PropStream import shows 0 contacts:**
+Check that the CSV has the expected headers (First Name, Last Name, Company Name, etc.). The parser matches by exact header name. Open browser console to check for parse errors.
+
+**Buyers not showing in property matches:**
+Buyers need complete criteria (zip_codes, property_types, condition_tolerance all non-null) and an active status (not inactive or not_investor) to appear in matches. Newly imported buyers have null criteria until you edit them or log a hot conversation.
+
+**Portfolio tier not showing:**
+Make sure you ran `ALTER TABLE buyers ADD COLUMN portfolio_tier TEXT;` and reimported your CSVs after deploying the latest app.js.
