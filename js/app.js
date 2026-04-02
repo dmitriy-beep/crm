@@ -1,6 +1,10 @@
 // ── SPA Router ──────────────────────────────────────────────────────────────
 const app = document.getElementById('app');
 
+// ── Data Cache (avoid re-fetching on filter/status clicks) ──────────────────
+const _cache = {};
+function invalidateCache(key) { if (key) delete _cache[key]; else Object.keys(_cache).forEach(k => delete _cache[k]); }
+
 function navigate(path, pushState = true) {
     if (pushState) history.pushState(null, '', path);
     route(path);
@@ -119,11 +123,13 @@ async function renderDashboard() {
 
 // ── Buyers List ─────────────────────────────────────────────────────────────
 async function renderBuyersList(params) {
-    app.innerHTML = '<div class="loading">Loading buyers…</div>';
-    let query = db.from('buyers').select('*').order('name');
-
-    const { data: buyers, error } = await query;
-    let filtered = buyers || [];
+    if (!_cache.buyers) {
+        app.innerHTML = '<div class="loading">Loading buyers…</div>';
+        const { data: buyers } = await db.from('buyers').select('*').order('name');
+        _cache.buyers = buyers || [];
+    }
+    const buyers = _cache.buyers;
+    let filtered = [...buyers];
 
     const search = params?.get('search');
     const status = params?.get('status');
@@ -348,6 +354,7 @@ window.confirmPropStreamBuyerImport = async () => {
 
     if (errors) flash(`Imported ${inserted} buyers (${errors} chunk(s) had errors)`, 'error');
     else flash(`Imported ${inserted} buyers from PropStream → "${batchName}"`);
+    invalidateCache('buyers');
     navigate('/buyers?batch=' + encodeURIComponent(batchName));
 };
 
@@ -562,6 +569,7 @@ window.saveBuyer = async (action) => {
     }
 
     if (result.error) { flash(result.error.message, 'error'); return; }
+    invalidateCache('buyers');
     flash(id ? 'Buyer updated' : 'Buyer added');
     if (action === 'save_add') navigate('/buyers/new');
     else navigate(id ? `/buyers/${id}` : '/buyers');
@@ -571,6 +579,7 @@ window.deleteBuyer = async (id) => {
     if (!confirm('Delete this buyer?')) return;
     await db.from('activity_log').delete().eq('contact_type', 'buyer').eq('contact_id', id);
     await db.from('buyers').delete().eq('id', id);
+    invalidateCache('buyers');
     flash('Buyer deleted');
     navigate('/buyers');
 };
@@ -647,13 +656,19 @@ async function renderBuyerDetail(id) {
 
 // ── Properties List ─────────────────────────────────────────────────────────
 async function renderPropertiesList(params) {
-    app.innerHTML = '<div class="loading">Loading properties…</div>';
-    const [{ data: properties }, { data: allBuyers }] = await Promise.all([
-        db.from('properties').select('*').order('created_at', { ascending: false }),
-        db.from('buyers').select('*')
-    ]);
+    if (!_cache.properties || !_cache.buyers) {
+        app.innerHTML = '<div class="loading">Loading properties…</div>';
+        const [{ data: properties }, { data: allBuyers }] = await Promise.all([
+            db.from('properties').select('*').order('created_at', { ascending: false }),
+            db.from('buyers').select('*')
+        ]);
+        _cache.properties = properties || [];
+        _cache.buyers = allBuyers || [];
+    }
+    const properties = _cache.properties;
+    const allBuyers = _cache.buyers;
 
-    let filtered = properties || [];
+    let filtered = [...properties];
     const search = params?.get('search');
     const status = params?.get('status');
     const condition = params?.get('condition');
@@ -840,6 +855,7 @@ window.saveProperty = async (action) => {
         : await db.from('properties').insert(data);
 
     if (result.error) { flash(result.error.message, 'error'); return; }
+    invalidateCache('properties');
     flash(id ? 'Property updated' : 'Property added');
     if (action === 'save_add') navigate('/properties/new');
     else navigate(id ? `/properties/${id}` : '/properties');
@@ -848,6 +864,7 @@ window.saveProperty = async (action) => {
 window.deleteProperty = async (id) => {
     if (!confirm('Delete this property?')) return;
     await db.from('properties').delete().eq('id', id);
+    invalidateCache('properties');
     flash('Property deleted');
     navigate('/properties');
 };
@@ -933,9 +950,13 @@ async function renderPropertyDetail(id) {
 
 // ── Contacts List ───────────────────────────────────────────────────────────
 async function renderContactsList(params) {
-    app.innerHTML = '<div class="loading">Loading contacts…</div>';
-    const { data: contacts } = await db.from('contacts').select('*').order('name');
-    let filtered = contacts || [];
+    if (!_cache.contacts) {
+        app.innerHTML = '<div class="loading">Loading contacts…</div>';
+        const { data: contacts } = await db.from('contacts').select('*').order('name');
+        _cache.contacts = contacts || [];
+    }
+    const contacts = _cache.contacts;
+    let filtered = [...contacts];
     const search = params?.get('search');
     const role = params?.get('role');
     const batch = params?.get('batch');
@@ -1218,6 +1239,7 @@ window.confirmPropStreamImport = async () => {
 
     if (errors) flash(`Imported ${inserted} contacts (${errors} chunk(s) had errors)`, 'error');
     else flash(`Imported ${inserted} contacts from PropStream → "${batchName}"`);
+    invalidateCache('contacts');
     navigate('/contacts?batch=' + encodeURIComponent(batchName));
 };
 
@@ -1227,6 +1249,7 @@ window.renameBatch = async (table, oldName) => {
     if (!newName || newName === oldName) return;
     const { error } = await db.from(table).update({ import_batch: newName }).eq('import_batch', oldName);
     if (error) { flash(error.message, 'error'); return; }
+    invalidateCache(table);
     flash(`Renamed "${oldName}" → "${newName}"`);
     navigate(`/${table}?batch=${encodeURIComponent(newName)}`);
 };
@@ -1243,6 +1266,7 @@ window.deleteBatch = async (table, batchName) => {
     }
     const { error } = await db.from(table).delete().eq('import_batch', batchName);
     if (error) { flash(error.message, 'error'); return; }
+    invalidateCache(table);
     flash(`Deleted ${count} records from batch "${batchName}"`);
     navigate(`/${table}`);
 };
@@ -1284,6 +1308,7 @@ window.saveContact = async (action) => {
     const id = window._editContactId;
     const result = id ? await db.from('contacts').update(data).eq('id', id) : await db.from('contacts').insert(data);
     if (result.error) { flash(result.error.message, 'error'); return; }
+    invalidateCache('contacts');
     flash(id ? 'Contact updated' : 'Contact added');
     if (action === 'save_add') navigate('/contacts/new');
     else navigate(id ? `/contacts/${id}` : '/contacts');
@@ -1292,6 +1317,7 @@ window.saveContact = async (action) => {
 window.deleteContact = async (id) => {
     if (!confirm('Delete?')) return;
     await db.from('contacts').delete().eq('id', id);
+    invalidateCache('contacts');
     flash('Contact deleted'); navigate('/contacts');
 };
 
@@ -1776,6 +1802,8 @@ window.saveActivity = async (action) => {
         await db.from('contacts').update(upd).eq('id', data.contact_id);
     }
 
+    invalidateCache('buyers');
+    invalidateCache('contacts');
     flash('Activity logged');
     if (action === 'save_add') {
         navigate('/activities/new');
