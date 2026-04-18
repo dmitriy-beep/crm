@@ -478,7 +478,7 @@
 
   <!-- ═══════════ HERO / FORM SECTION ═══════════ -->
   <section class="hero">
-    <div class="brand"><span class="mark"></span>Amen Real Estate</div>
+    <div class="brand"><span class="mark"></span>Dimalytics Realty</div>
 
     <div class="hero-inner">
       <div class="welcome">
@@ -539,29 +539,29 @@
   <!-- ═══════════ AGENT / ABOUT SECTION ═══════════ -->
   <section class="about">
     <div class="about-inner">
-      <img src="agent.png" alt="Your agent" class="agent-photo" onerror="this.style.display='none'">
+      <img src="agent.jpg" alt="Your agent" class="agent-photo" onerror="this.style.display='none'">
 
       <div class="about-text">
-        <div class="eyebrow">Dmitriy</div>
-        <h2>Hi, I'm <em>Dmitriy Teplyuk</em>.</h2>
-        <p>I'm a real estate agent focused on the Sacramento and Placer County area. I help buyers find homes that actually fit what they need and I work with investors on off-market deals when that's the better fit.</p>
-        <p class="muted">Whether you're ready to buy, still figuring things out, or just wanted to see the house: no pressure. I'm happy to answer any question you have, today or down the road.</p>
+        <div class="eyebrow">Your Host</div>
+        <h2>Hi, I'm <em>[Your Name]</em>.</h2>
+        <p>I'm a real estate agent focused on the Sacramento and Placer County area. I help buyers find homes that actually fit what they need — and I work with investors on off-market deals when that's the better fit.</p>
+        <p class="muted">Whether you're ready to buy, still figuring things out, or just wanted to see the house — no pressure. I'm happy to answer any question you have, today or down the road.</p>
 
         <div class="contact-row">
-          <a href="tel:+14085021799">
+          <a href="tel:+19165550100">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            (408)) 502-1799
+            (916) 555-0100
           </a>
-          <a href="mailto:dmitriy@amenrealestate.com">
+          <a href="mailto:you@dimalytics.com">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            dmitriy@amenrealestate.com
+            you@dimalytics.com
           </a>
         </div>
       </div>
     </div>
   </section>
 
-  <div class="footer">DRE# 02440075 · Amen Real Estate</div>
+  <div class="footer">DRE# 00000000 · Dimalytics Realty</div>
 
 </div>
 
@@ -575,15 +575,25 @@
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqa3BjdnZvcWJrcnV6bWV4bWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTAxMzcsImV4cCI6MjA4OTQ2NjEzN30.Unk_5PWrvTvwdPMMpAhFBXce8EunIqdUB7sFYaLb0xg';
 
   // ★ CHANGE THIS FOR EACH OPEN HOUSE ★
-  // This is how you'll find these leads later in the CRM (filter by Import Batch).
-  // Format suggestion: open_house_<shortaddress>_<yyyymmdd>
-  const OPEN_HOUSE_BATCH = 'open_house_front1_' + new Date().toISOString().slice(0,10).replace(/-/g,'');
+  // Short tag so you can tell which event each lead came from in Supabase.
+  // Format suggestion: <shortaddress>_<yyyymmdd>
+  const EVENT_TAG = 'front1_' + new Date().toISOString().slice(0,10).replace(/-/g,'');
 
-  // A human-friendly label you want saved into notes (e.g. property address)
-  const OPEN_HOUSE_LABEL = 'Open House sign-in';
+  // A human-friendly label saved into the notes field (e.g. full property address)
+  const EVENT_LABEL = 'Open House sign-in';
 
   // ─────────── INIT ───────────
-  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // Intake form is stateless — tell the SDK not to load, persist, or
+  // refresh any auth session. Otherwise the SDK picks up a session from
+  // the main CRM's localStorage and tries to refresh the token in the
+  // background, spamming the network.
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      persistSession:     false,
+      autoRefreshToken:   false,
+      detectSessionInUrl: false,
+    },
+  });
 
   const form    = document.getElementById('intakeForm');
   const errBox  = document.getElementById('errorMsg');
@@ -624,28 +634,20 @@
     btn.disabled = true;
     btn.textContent = 'Submitting…';
 
-    // Build the row for the buyers table.
-    // We tag it so you can find it in the CRM later.
+    // Build the row for the open_house_leads table.
     const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
-    const noteLines = [
-      `[${OPEN_HOUSE_LABEL}] submitted ${timestamp}`,
-      data.timeline ? `Looking: ${data.timeline}` : null,
-    ].filter(Boolean);
 
     const row = {
-      name:     data.name,
-      phone:    data.phone,
-      email:    data.email,
-      source:   'other',
-      status:   'new',
-      preferred_contact: 'call',
-      proof_of_funds_verified: false,
-      deals_last_12_months: 0,
-      notes:    noteLines.join('\n'),
-      import_batch: OPEN_HOUSE_BATCH,
+      name:      data.name,
+      phone:     data.phone,
+      email:     data.email,
+      timeline:  data.timeline || null,
+      event_tag: EVENT_TAG,
+      status:    'new',
+      notes:     `[${EVENT_LABEL}] submitted ${timestamp}`,
     };
 
-    const { error } = await db.from('buyers').insert(row);
+    const { error } = await db.from('open_house_leads').insert(row);
 
     if (error) {
       console.error('Insert error:', error);
