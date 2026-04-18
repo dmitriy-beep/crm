@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open House — Welcome</title>
+<meta name="description" content="Open house sign-in. Leave your info and we'll follow up.">
+<meta name="robots" content="noindex, nofollow">
+
+<!-- Fonts: a refined serif for display + clean sans for body -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ink:        #1a1613;
+    --paper:      #f7f2ea;
+    --cream:      #ede4d3;
+    --gold:       #b08a4a;
+    --gold-soft:  #c9a876;
+    --muted:      #6e6660;
+    --line:       rgba(26, 22, 19, 0.12);
+    --shadow-sm:  0 2px 12px rgba(26, 22, 19, 0.08);
+    --shadow-md:  0 10px 40px rgba(26, 22, 19, 0.18);
+    --shadow-lg:  0 24px 80px rgba(26, 22, 19, 0.28);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background: var(--ink);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ─────────── FIXED BACKGROUND HERO IMAGE ─────────── */
+  /* The house photo is set as a fixed background so it remains in view
+     as the user scrolls. On mobile, `fixed` is flaky — we use a dedicated
+     fixed <div> approach instead of background-attachment: fixed which
+     is unreliable on iOS. */
+  .bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image: url('front-1.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    /* Dim the image a bit so form & text are readable */
+    filter: brightness(0.68) saturate(1.05);
+  }
+
+  /* A second, very dark gradient overlay to make the top form card pop. */
+  .bg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background:
+      linear-gradient(180deg,
+        rgba(26, 22, 19, 0.25) 0%,
+        rgba(26, 22, 19, 0.45) 60%,
+        rgba(26, 22, 19, 0.75) 100%);
+    pointer-events: none;
+  }
+
+  /* Content wrapper sits above the fixed background */
+  .page {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ─────────── HERO / FORM SECTION ─────────── */
+  .hero {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px 40px;
+  }
+
+  .brand {
+    color: var(--paper);
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: 0.02em;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  }
+  .brand .mark {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--gold-soft);
+    border-radius: 50%;
+    margin-right: 10px;
+    vertical-align: middle;
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 4px rgba(201, 168, 118, 0.2);
+  }
+
+  .hero-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 0 20px;
+  }
+
+  .welcome {
+    text-align: center;
+    color: var(--paper);
+    margin-bottom: 28px;
+    max-width: 560px;
+  }
+  .welcome .eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold-soft);
+    margin-bottom: 14px;
+    font-weight: 500;
+  }
+  .welcome h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: clamp(34px, 6.5vw, 52px);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+  }
+  .welcome h1 em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--gold-soft);
+  }
+  .welcome p {
+    font-size: 15px;
+    line-height: 1.55;
+    color: rgba(247, 242, 234, 0.82);
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  /* ─────────── FORM CARD ─────────── */
+  .form-card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 32px 28px 28px;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+  }
+  .form-card::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold) 0%, var(--gold-soft) 50%, var(--gold) 100%);
+    border-radius: 4px 4px 0 0;
+  }
+
+  .form-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .form-sub {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-bottom: 22px;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .field label .req {
+    color: var(--gold);
+    margin-left: 2px;
+  }
+
+  .field input,
+  .field select {
+    width: 100%;
+    padding: 12px 14px;
+    font-family: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .field input:focus,
+  .field select:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(176, 138, 74, 0.15);
+  }
+
+  .field select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%23b08a4a' d='M6 8L0 0h12z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  .btn-submit {
+    width: 100%;
+    margin-top: 8px;
+    padding: 14px 20px;
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    color: var(--paper);
+    background: var(--ink);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+  .btn-submit:hover {
+    background: #2a2320;
+  }
+  .btn-submit:active {
+    transform: translateY(1px);
+  }
+  .btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .privacy {
+    margin-top: 14px;
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.45;
+  }
+
+  .error-msg {
+    display: none;
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: #fce8e6;
+    color: #a33;
+    font-size: 13px;
+    border-radius: 3px;
+    border-left: 3px solid #c53030;
+  }
+  .error-msg.show { display: block; }
+
+  .scroll-hint {
+    text-align: center;
+    margin-top: 36px;
+    color: rgba(247, 242, 234, 0.65);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .scroll-hint .arrow {
+    display: block;
+    margin: 10px auto 0;
+    width: 1px;
+    height: 36px;
+    background: linear-gradient(180deg, rgba(247,242,234,0.6), rgba(247,242,234,0));
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); opacity: 0.8; }
+    50%      { transform: translateY(6px); opacity: 0.4; }
+  }
+
+  /* ─────────── AGENT / ABOUT SECTION ─────────── */
+  /* This sits BELOW the hero. When users scroll, the fixed house image
+     stays visible behind it, but a cream-colored card covers most of the
+     viewport showing the agent. On mobile this is the "scroll down" payoff. */
+  .about {
+    background: var(--paper);
+    padding: 60px 20px 80px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .about-inner {
+    max-width: 720px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  .agent-photo {
+    width: 200px;
+    height: 240px;
+    object-fit: cover;
+    border-radius: 2px;
+    box-shadow: var(--shadow-md);
+    display: block;
+  }
+
+  .about-text .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  .about-text h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: clamp(28px, 4.5vw, 38px);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+  .about-text h2 em {
+    font-style: italic;
+    color: var(--gold);
+  }
+  .about-text p {
+    color: var(--ink);
+    font-size: 15.5px;
+    line-height: 1.65;
+    margin-bottom: 14px;
+  }
+  .about-text p.muted {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .contact-row {
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 14px;
+  }
+  .contact-row a {
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.15s ease;
+  }
+  .contact-row a:hover { color: var(--gold); }
+  .contact-row .ico {
+    width: 16px;
+    height: 16px;
+    color: var(--gold);
+  }
+
+  .footer {
+    text-align: center;
+    padding: 24px 20px;
+    color: rgba(247, 242, 234, 0.5);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    background: var(--ink);
+  }
+
+  /* ─────────── SUCCESS STATE ─────────── */
+  .success-card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--paper);
+    border-radius: 4px;
+    padding: 44px 32px;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+    position: relative;
+  }
+  .success-card::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold) 0%, var(--gold-soft) 50%, var(--gold) 100%);
+    border-radius: 4px 4px 0 0;
+  }
+  .success-card .check {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 18px;
+    font-size: 28px;
+  }
+  .success-card h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 28px;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .success-card p {
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  /* ─────────── MOBILE ─────────── */
+  @media (max-width: 600px) {
+    .hero { padding: 20px 16px 32px; }
+    .form-card { padding: 26px 22px 24px; }
+
+    .about { padding: 48px 20px 60px; }
+    .about-inner {
+      grid-template-columns: 1fr;
+      gap: 24px;
+      text-align: center;
+    }
+    .agent-photo {
+      margin: 0 auto;
+      width: 180px;
+      height: 216px;
+    }
+    .contact-row {
+      justify-content: center;
+    }
+
+    .welcome h1 { font-size: 36px; }
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Fixed house image background (stays put as user scrolls) -->
+<div class="bg-layer" role="presentation"></div>
+<div class="bg-overlay" role="presentation"></div>
+
+<div class="page">
+
+  <!-- ═══════════ HERO / FORM SECTION ═══════════ -->
+  <section class="hero">
+    <div class="brand"><span class="mark"></span>Amen Real Estate</div>
+
+    <div class="hero-inner">
+      <div class="welcome">
+        <div class="eyebrow">Open House · Welcome</div>
+        <h1>Thanks for <em>stopping by</em>.</h1>
+        <p>Leave your info below and I'll send you the listing details, comps, and any new homes that match what you're looking for.</p>
+      </div>
+
+      <!-- Form card -->
+      <div class="form-card" id="formCard">
+        <div class="form-title">Sign in</div>
+        <div class="form-sub">Takes less than 30 seconds.</div>
+
+        <form id="intakeForm" novalidate autocomplete="on">
+          <div class="field">
+            <label for="name">Name<span class="req">*</span></label>
+            <input type="text" id="name" name="name" required autocomplete="name" placeholder="Jane Smith">
+          </div>
+
+          <div class="field">
+            <label for="phone">Phone<span class="req">*</span></label>
+            <input type="tel" id="phone" name="phone" required autocomplete="tel" placeholder="(916) 555-0123" inputmode="tel">
+          </div>
+
+          <div class="field">
+            <label for="email">Email<span class="req">*</span></label>
+            <input type="email" id="email" name="email" required autocomplete="email" placeholder="jane@email.com" inputmode="email">
+          </div>
+
+          <div class="field">
+            <label for="timeline">How long have you been looking?</label>
+            <select id="timeline" name="timeline">
+              <option value="">— Select —</option>
+              <option value="Just browsing today">Just browsing today</option>
+              <option value="Less than 1 month">Less than 1 month</option>
+              <option value="1–3 months">1–3 months</option>
+              <option value="3–6 months">3–6 months</option>
+              <option value="6–12 months">6–12 months</option>
+              <option value="Over a year">Over a year</option>
+              <option value="Not actively — just curious">Not actively — just curious</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-submit" id="submitBtn">Sign In</button>
+
+          <div class="error-msg" id="errorMsg"></div>
+
+          <div class="privacy">Your info goes straight to me. No spam, no list sharing, promise.</div>
+        </form>
+      </div>
+
+      <div class="scroll-hint">
+        More about me<span class="arrow"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ AGENT / ABOUT SECTION ═══════════ -->
+  <section class="about">
+    <div class="about-inner">
+      <img src="agent.png" alt="Your agent" class="agent-photo" onerror="this.style.display='none'">
+
+      <div class="about-text">
+        <div class="eyebrow">Dmitriy</div>
+        <h2>Hi, I'm <em>Dmitriy Teplyuk</em>.</h2>
+        <p>I'm a real estate agent focused on the Sacramento and Placer County area. I help buyers find homes that actually fit what they need and I work with investors on off-market deals when that's the better fit.</p>
+        <p class="muted">Whether you're ready to buy, still figuring things out, or just wanted to see the house: no pressure. I'm happy to answer any question you have, today or down the road.</p>
+
+        <div class="contact-row">
+          <a href="tel:+14085021799">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            (408)) 502-1799
+          </a>
+          <a href="mailto:dmitriy@amenrealestate.com">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            dmitriy@amenrealestate.com
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">DRE# 02440075 · Amen Real Estate</div>
+
+</div>
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+  // ─────────── CONFIG ───────────
+  // Same Supabase project as the CRM.
+  const SUPABASE_URL = 'https://cjkpcvvoqbkruzmexmam.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNqa3BjdnZvcWJrcnV6bWV4bWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTAxMzcsImV4cCI6MjA4OTQ2NjEzN30.Unk_5PWrvTvwdPMMpAhFBXce8EunIqdUB7sFYaLb0xg';
+
+  // ★ CHANGE THIS FOR EACH OPEN HOUSE ★
+  // This is how you'll find these leads later in the CRM (filter by Import Batch).
+  // Format suggestion: open_house_<shortaddress>_<yyyymmdd>
+  const OPEN_HOUSE_BATCH = 'open_house_front1_' + new Date().toISOString().slice(0,10).replace(/-/g,'');
+
+  // A human-friendly label you want saved into notes (e.g. property address)
+  const OPEN_HOUSE_LABEL = 'Open House sign-in';
+
+  // ─────────── INIT ───────────
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const form    = document.getElementById('intakeForm');
+  const errBox  = document.getElementById('errorMsg');
+  const btn     = document.getElementById('submitBtn');
+  const card    = document.getElementById('formCard');
+
+  function showError(msg) {
+    errBox.textContent = msg;
+    errBox.classList.add('show');
+  }
+  function hideError() {
+    errBox.classList.remove('show');
+  }
+
+  // Basic client-side validation
+  function validate(data) {
+    if (!data.name || data.name.trim().length < 2) return 'Please enter your name.';
+    if (!data.phone || data.phone.replace(/\D/g, '').length < 10) return 'Please enter a valid phone number.';
+    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return 'Please enter a valid email.';
+    return null;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError();
+
+    const fd = new FormData(form);
+    const data = {
+      name:     (fd.get('name')     || '').toString().trim(),
+      phone:    (fd.get('phone')    || '').toString().trim(),
+      email:    (fd.get('email')    || '').toString().trim(),
+      timeline: (fd.get('timeline') || '').toString().trim(),
+    };
+
+    const err = validate(data);
+    if (err) { showError(err); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    // Build the row for the buyers table.
+    // We tag it so you can find it in the CRM later.
+    const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+    const noteLines = [
+      `[${OPEN_HOUSE_LABEL}] submitted ${timestamp}`,
+      data.timeline ? `Looking: ${data.timeline}` : null,
+    ].filter(Boolean);
+
+    const row = {
+      name:     data.name,
+      phone:    data.phone,
+      email:    data.email,
+      source:   'other',
+      status:   'new',
+      preferred_contact: 'call',
+      proof_of_funds_verified: false,
+      deals_last_12_months: 0,
+      notes:    noteLines.join('\n'),
+      import_batch: OPEN_HOUSE_BATCH,
+    };
+
+    const { error } = await db.from('buyers').insert(row);
+
+    if (error) {
+      console.error('Insert error:', error);
+      showError('Something went wrong saving that. Please try again or hand your info to the agent directly.');
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+      return;
+    }
+
+    // Replace the form with a success card.
+    card.innerHTML = `
+      <div class="success-card" style="box-shadow:none;padding:20px 0;">
+        <div class="check">✓</div>
+        <h2>You're in.</h2>
+        <p>Thanks, ${data.name.split(' ')[0] || 'there'}! I'll be in touch soon. Enjoy the rest of the open house.</p>
+      </div>
+    `;
+    // Gently scroll the confirmation into view
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+</script>
+
+</body>
+</html>
