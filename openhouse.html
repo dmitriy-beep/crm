@@ -2,10 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Open House — Welcome</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Open House | Welcome</title>
 <meta name="description" content="Open house sign-in. Leave your info and we'll follow up.">
 <meta name="robots" content="noindex, nofollow">
+
+<!-- iOS full-screen / add-to-home-screen support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Open House">
+<meta name="theme-color" content="#1a1613">
+
+<!-- Home-screen icon on iPad. Falls back silently if the file isn't there. -->
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.ico">
 
 <!-- Fonts: a refined serif for display + clean sans for body -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,11 +48,29 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Respect iPad/iPhone safe areas when running fullscreen (home screen
+       or Fullscreen API). Without this, content gets clipped by the notch
+       or home indicator. */
+    padding-top:    env(safe-area-inset-top);
+    padding-right:  env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left:   env(safe-area-inset-left);
+    /* Prevent iOS rubber-band scroll so it feels like a real app */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* The fixed background layers need to ignore safe-area padding so they
+     still cover the whole screen edge-to-edge. */
+  .bg-layer, .bg-overlay {
+    margin-top:    calc(env(safe-area-inset-top)    * -1);
+    margin-right:  calc(env(safe-area-inset-right)  * -1);
+    margin-bottom: calc(env(safe-area-inset-bottom) * -1);
+    margin-left:   calc(env(safe-area-inset-left)   * -1);
   }
 
   /* ─────────── FIXED BACKGROUND HERO IMAGE ─────────── */
   /* The house photo is set as a fixed background so it remains in view
-     as the user scrolls. On mobile, `fixed` is flaky — we use a dedicated
+     as the user scrolls. On mobile, `fixed` is flaky, so we use a dedicated
      fixed <div> approach instead of background-attachment: fixed which
      is unreliable on iOS. */
   .bg-layer {
@@ -478,7 +507,7 @@
 
   <!-- ═══════════ HERO / FORM SECTION ═══════════ -->
   <section class="hero">
-    <div class="brand"><span class="mark"></span>Dimalytics Realty</div>
+    <div class="brand"><span class="mark"></span>Amen Real Estate</div>
 
     <div class="hero-inner">
       <div class="welcome">
@@ -511,14 +540,14 @@
           <div class="field">
             <label for="timeline">How long have you been looking?</label>
             <select id="timeline" name="timeline">
-              <option value="">— Select —</option>
+              <option value="">Select one</option>
               <option value="Just browsing today">Just browsing today</option>
               <option value="Less than 1 month">Less than 1 month</option>
-              <option value="1–3 months">1–3 months</option>
-              <option value="3–6 months">3–6 months</option>
-              <option value="6–12 months">6–12 months</option>
+              <option value="1 to 3 months">1 to 3 months</option>
+              <option value="3 to 6 months">3 to 6 months</option>
+              <option value="6 to 12 months">6 to 12 months</option>
               <option value="Over a year">Over a year</option>
-              <option value="Not actively — just curious">Not actively — just curious</option>
+              <option value="Not actively, just curious">Not actively, just curious</option>
             </select>
           </div>
 
@@ -543,25 +572,21 @@
 
       <div class="about-text">
         <div class="eyebrow">Your Host</div>
-        <h2>Hi, I'm <em>[Your Name]</em>.</h2>
-        <p>I'm a real estate agent focused on the Sacramento and Placer County area. I help buyers find homes that actually fit what they need — and I work with investors on off-market deals when that's the better fit.</p>
-        <p class="muted">Whether you're ready to buy, still figuring things out, or just wanted to see the house — no pressure. I'm happy to answer any question you have, today or down the road.</p>
+        <h2>Hi, I'm <em>Dmitriy Teplyuk</em>.</h2>
+        <p>I'm a real estate agent with Amen Real Estate, focused on the Sacramento and Placer County area. I help buyers find homes that actually fit what they need, and I work with investors on off-market deals when that's the better fit.</p>
+        <p class="muted">Whether you're ready to buy, still figuring things out, or just wanted to see the house, no pressure. I'm happy to answer any question you have, today or down the road.</p>
 
         <div class="contact-row">
-          <a href="tel:+19165550100">
-            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            (916) 555-0100
-          </a>
-          <a href="mailto:you@dimalytics.com">
+          <a href="mailto:dmitriy@amenrealestate.com">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            you@dimalytics.com
+            dmitriy@amenrealestate.com
           </a>
         </div>
       </div>
     </div>
   </section>
 
-  <div class="footer">DRE# 00000000 · Dimalytics Realty</div>
+  <div class="footer">Dmitriy Teplyuk · Amen Real Estate</div>
 
 </div>
 
@@ -583,7 +608,7 @@
   const EVENT_LABEL = 'Open House sign-in';
 
   // ─────────── INIT ───────────
-  // Intake form is stateless — tell the SDK not to load, persist, or
+  // Intake form is stateless. Tell the SDK not to load, persist, or
   // refresh any auth session. Otherwise the SDK picks up a session from
   // the main CRM's localStorage and tries to refresh the token in the
   // background, spamming the network.
@@ -657,16 +682,34 @@
       return;
     }
 
+    // Save the original form HTML so we can restore it for the next person
+    const originalFormHTML = card.innerHTML;
+
     // Replace the form with a success card.
     card.innerHTML = `
       <div class="success-card" style="box-shadow:none;padding:20px 0;">
         <div class="check">✓</div>
         <h2>You're in.</h2>
         <p>Thanks, ${data.name.split(' ')[0] || 'there'}! I'll be in touch soon. Enjoy the rest of the open house.</p>
+        <p style="margin-top:18px;font-size:12px;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;">Next guest, tap to sign in</p>
       </div>
     `;
     // Gently scroll the confirmation into view
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Kiosk mode: auto-reset to a fresh form after 8 seconds OR on any tap,
+    // whichever comes first. This lets the next open-house guest walk up to
+    // a clean form without any setup between them.
+    const resetForm = () => {
+      card.innerHTML = originalFormHTML;
+      // Re-bind the form since we swapped the HTML
+      location.reload();
+    };
+    const autoResetTimer = setTimeout(resetForm, 8000);
+    card.addEventListener('click', () => {
+      clearTimeout(autoResetTimer);
+      resetForm();
+    }, { once: true });
   });
 </script>
 
