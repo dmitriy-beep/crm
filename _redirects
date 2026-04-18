@@ -1,4 +1,2 @@
-/openhouse         /openhouse.html    200
-/openhouse.html    /openhouse.html    200!
-/index.html        /index.html        200!
-/*                 /index.html        200
+/openhouse    /openhouse.html    200
+/*            /index.html        200
