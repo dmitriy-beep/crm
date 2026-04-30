@@ -85,6 +85,11 @@ tr:hover td { background:var(--surface2); }
 .status-btn-active { background:color-mix(in srgb, var(--btn-color) 22%, transparent); border-color:var(--btn-color); box-shadow:0 0 0 1px color-mix(in srgb, var(--btn-color) 30%, transparent); }
 .status-count { background:color-mix(in srgb, var(--btn-color) 20%, transparent); padding:1px 7px; border-radius:10px; font-size:11px; font-weight:700; min-width:20px; text-align:center; }
 
+.toggle-group { display:flex; flex-wrap:wrap; gap:6px; }
+.toggle-btn { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid var(--border); background:var(--surface2); color:var(--text2); cursor:pointer; transition:all .15s; }
+.toggle-btn:hover { border-color:var(--accent); color:var(--text); }
+.toggle-active { background:rgba(79,140,255,.18); border-color:var(--accent); color:var(--accent); }
+
 .flash { padding:10px 16px; border-radius:var(--radius); margin-bottom:16px; font-size:13px; animation: fadeout 4s forwards; }
 .flash-success { background:rgba(52,211,153,.15); color:var(--green); border:1px solid rgba(52,211,153,.3); }
 .flash-error { background:rgba(248,113,113,.15); color:var(--red); border:1px solid rgba(248,113,113,.3); }

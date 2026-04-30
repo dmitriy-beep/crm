@@ -88,7 +88,6 @@ function exportCSV(data, filename) {
 
 // Matching logic
 function getMatchingBuyers(property, buyers) {
-    const propCondition = CONDITION_RANK[property.condition_estimate] || 99;
     const matches = [];
 
     for (const b of buyers) {
@@ -111,8 +110,8 @@ function getMatchingBuyers(property, buyers) {
         const buyerTypes = (b.property_types || '').split(',').map(t => t.trim()).filter(Boolean);
         if (!buyerTypes.includes(property.property_type)) continue;
 
-        const buyerTol = CONDITION_RANK[b.condition_tolerance] || 99;
-        if (propCondition > buyerTol) continue;
+        const buyerConditions = (b.condition_tolerance || '').split(',').map(c => c.trim()).filter(Boolean);
+        if (!buyerConditions.includes(property.condition_estimate)) continue;
 
         matches.push(b);
     }
@@ -128,7 +127,7 @@ function getMatchingProperties(buyer, properties) {
 
     const buyerZips = buyer.zip_codes.split(',').map(z => z.trim()).filter(Boolean);
     const buyerTypes = buyer.property_types.split(',').map(t => t.trim()).filter(Boolean);
-    const buyerTol = CONDITION_RANK[buyer.condition_tolerance] || 99;
+    const buyerConditions = buyer.condition_tolerance.split(',').map(c => c.trim()).filter(Boolean);
     const matches = [];
 
     for (const p of properties) {
@@ -146,8 +145,7 @@ function getMatchingProperties(buyer, properties) {
 
         if (!buyerTypes.includes(p.property_type)) continue;
 
-        const propCond = CONDITION_RANK[p.condition_estimate] || 99;
-        if (propCond > buyerTol) continue;
+        if (!buyerConditions.includes(p.condition_estimate)) continue;
 
         matches.push(p);
     }

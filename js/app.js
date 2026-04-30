@@ -195,7 +195,7 @@ async function renderBuyersList(params) {
         <td>${(b.strategy || '').replace(/_/g,' ')}</td>
         <td class="money">${fmt(b.min_price)} – ${fmt(b.max_price)}</td>
         <td class="text-sm">${b.zip_codes || ''}</td>
-        <td>${(b.condition_tolerance || '').replace(/_/g,' ')}</td>
+        <td class="text-sm">${(b.condition_tolerance || '').split(',').map(c => c.trim().replace(/_/g,' ')).filter(Boolean).join(', ')}</td>
         <td>${(b.funding_method || '').replace(/_/g,' ')}</td>
         <td>${b.proof_of_funds_verified ? badge('✓','green') : badge('–','gray')}</td>
         <td>${b.deals_last_12_months}</td>
@@ -557,8 +557,8 @@ async function renderBuyerForm(id) {
         <div class="form-group full"><label>Target Zip Codes (comma-separated)</label><input type="text" name="zip_codes" value="${v('zip_codes')}" placeholder="95747,95678,95677"></div>
         <div class="form-group"><label>Min Price ($)</label><input type="number" name="min_price" value="${v('min_price')}"></div>
         <div class="form-group"><label>Max Price ($)</label><input type="number" name="max_price" value="${v('max_price')}"></div>
-        <div class="form-group"><label>Property Types (comma-separated)</label><input type="text" name="property_types" value="${v('property_types')}" placeholder="sfr,multi,land,condo"></div>
-        <div class="form-group"><label>Condition Tolerance</label><select name="condition_tolerance">${['turnkey','cosmetic','medium_rehab','full_gut'].map(s=>`<option value="${s}" ${sel('condition_tolerance',s)}>${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
+        <div class="form-group full"><label>Property Types</label><div class="toggle-group" id="tg-property_types">${['sfr','multi','land','condo'].map(s => `<button type="button" class="toggle-btn ${(v('property_types')||'').split(',').map(t=>t.trim()).includes(s) ? 'toggle-active' : ''}" data-val="${s}" onclick="this.classList.toggle('toggle-active')">${s.toUpperCase()}</button>`).join('')}</div></div>
+        <div class="form-group full"><label>Condition Tolerance</label><div class="toggle-group" id="tg-condition_tolerance">${['turnkey','cosmetic','medium_rehab','full_gut'].map(s => `<button type="button" class="toggle-btn ${(v('condition_tolerance')||'').split(',').map(t=>t.trim()).includes(s) ? 'toggle-active' : ''}" data-val="${s}" onclick="this.classList.toggle('toggle-active')">${s.replace(/_/g,' ')}</button>`).join('')}</div></div>
         <div class="form-group"><label>Strategy</label><select name="strategy">${['flip','brrrr','rental_hold','wholesale'].map(s=>`<option value="${s}" ${sel('strategy',s)}>${s === 'brrrr' ? 'BRRRR' : s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Funding Method</label><select name="funding_method">${['cash','hard_money','conventional','private_money'].map(s=>`<option value="${s}" ${sel('funding_method',s)}>${s.replace(/_/g,' ')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Deals (12mo)</label><input type="number" name="deals_last_12_months" value="${v('deals_last_12_months') || 0}"></div>
@@ -590,8 +590,8 @@ window.saveBuyer = async (action) => {
         source: fd.get('source'), zip_codes: fd.get('zip_codes') || null,
         min_price: fd.get('min_price') ? parseInt(fd.get('min_price')) : null,
         max_price: fd.get('max_price') ? parseInt(fd.get('max_price')) : null,
-        property_types: fd.get('property_types') || null,
-        condition_tolerance: fd.get('condition_tolerance'),
+        property_types: Array.from(document.querySelectorAll('#tg-property_types .toggle-active')).map(b => b.dataset.val).join(',') || null,
+        condition_tolerance: Array.from(document.querySelectorAll('#tg-condition_tolerance .toggle-active')).map(b => b.dataset.val).join(',') || null,
         strategy: fd.get('strategy'), funding_method: fd.get('funding_method'),
         proof_of_funds_verified: form.querySelector('[name=proof_of_funds_verified]').checked,
         deals_last_12_months: parseInt(fd.get('deals_last_12_months')) || 0,
@@ -655,8 +655,8 @@ async function renderBuyerDetail(id) {
       <div class="field"><div class="label">Funding</div><div class="value">${(buyer.funding_method||'').replace(/_/g,' ')}</div></div>
       <div class="field"><div class="label">Price Range</div><div class="value money">${fmt(buyer.min_price)} – ${fmt(buyer.max_price)}</div></div>
       <div class="field"><div class="label">Target Zips</div><div class="value">${buyer.zip_codes || '—'}</div></div>
-      <div class="field"><div class="label">Property Types</div><div class="value">${buyer.property_types || '—'}</div></div>
-      <div class="field"><div class="label">Condition Tolerance</div><div class="value">${(buyer.condition_tolerance||'').replace(/_/g,' ')}</div></div>
+      <div class="field"><div class="label">Property Types</div><div class="value">${(buyer.property_types||'').split(',').filter(Boolean).map(t => badge(t.trim().toUpperCase(), 'blue')).join(' ') || '—'}</div></div>
+      <div class="field"><div class="label">Condition Tolerance</div><div class="value">${(buyer.condition_tolerance||'').split(',').filter(Boolean).map(c => badge(c.trim().replace(/_/g,' '), 'blue')).join(' ') || '—'}</div></div>
       <div class="field"><div class="label">POF Verified</div><div class="value">${buyer.proof_of_funds_verified ? '✓ Yes' : '✗ No'}</div></div>
       <div class="field"><div class="label">Deals (12mo)</div><div class="value">${buyer.deals_last_12_months}</div></div>
       <div class="field"><div class="label">Portfolio Tier</div><div class="value">${buyer.portfolio_tier ? badge(buyer.portfolio_tier + ' properties', tierColor(buyer.portfolio_tier)) : '—'}</div></div>
@@ -970,7 +970,7 @@ async function renderPropertyDetail(id) {
         <td>${b.strategy==='brrrr'?'BRRRR':(b.strategy||'').replace(/_/g,' ')}</td>
         <td>${(b.funding_method||'').replace(/_/g,' ')}</td>
         <td class="money">${fmt(b.min_price)}–${fmt(b.max_price)}</td>
-        <td>${(b.condition_tolerance||'').replace(/_/g,' ')}</td>
+        <td class="text-sm">${(b.condition_tolerance||'').split(',').map(c => c.trim().replace(/_/g,' ')).filter(Boolean).join(', ')}</td>
         <td>${b.proof_of_funds_verified?badge('✓','green'):'–'}</td>
         <td>${b.deals_last_12_months}</td>
         <td>${badge(b.status, buyerStatusColor(b.status))}</td>
@@ -1615,8 +1615,8 @@ async function renderActivityForm(params) {
         <div class="form-group full"><label>Target Zip Codes (comma-separated)</label><input type="text" id="qc_zips" value="${preBuyer?.zip_codes||''}" placeholder="95747,95678,95677"></div>
         <div class="form-group"><label>Min Price ($)</label><input type="number" id="qc_min_price" value="${preBuyer?.min_price||''}"></div>
         <div class="form-group"><label>Max Price ($)</label><input type="number" id="qc_max_price" value="${preBuyer?.max_price||''}"></div>
-        <div class="form-group"><label>Property Types (comma-separated)</label><input type="text" id="qc_ptypes" value="${preBuyer?.property_types||''}" placeholder="sfr,multi,land,condo"></div>
-        <div class="form-group"><label>Condition Tolerance</label><select id="qc_condition">${['','turnkey','cosmetic','medium_rehab','full_gut'].map(s=>`<option value="${s}">${s ? s.replace(/_/g,' ') : '— select —'}</option>`).join('')}</select></div>
+        <div class="form-group full"><label>Property Types</label><div class="toggle-group" id="qc_ptypes">${['sfr','multi','land','condo'].map(s => `<button type="button" class="toggle-btn ${(preBuyer?.property_types||'').split(',').map(t=>t.trim()).includes(s) ? 'toggle-active' : ''}" data-val="${s}" onclick="this.classList.toggle('toggle-active')">${s.toUpperCase()}</button>`).join('')}</div></div>
+        <div class="form-group full"><label>Condition Tolerance</label><div class="toggle-group" id="qc_condition">${['turnkey','cosmetic','medium_rehab','full_gut'].map(s => `<button type="button" class="toggle-btn ${(preBuyer?.condition_tolerance||'').split(',').map(t=>t.trim()).includes(s) ? 'toggle-active' : ''}" data-val="${s}" onclick="this.classList.toggle('toggle-active')">${s.replace(/_/g,' ')}</button>`).join('')}</div></div>
         <div class="form-group"><label>Strategy</label><select id="qc_strategy">${['','flip','brrrr','rental_hold','wholesale'].map(s=>`<option value="${s}">${s === 'brrrr' ? 'BRRRR' : (s ? s.replace(/_/g,' ') : '— select —')}</option>`).join('')}</select></div>
         <div class="form-group"><label>Funding Method</label><select id="qc_funding">${['','cash','hard_money','conventional','private_money'].map(s=>`<option value="${s}">${s ? s.replace(/_/g,' ') : '— select —'}</option>`).join('')}</select></div>
         <div class="form-group"><label>Deals (12mo)</label><input type="number" id="qc_deals" value="${preBuyer?.deals_last_12_months||0}"></div>
@@ -1821,8 +1821,8 @@ window.saveActivity = async (action) => {
             const zips = document.getElementById('qc_zips')?.value;
             const minP = document.getElementById('qc_min_price')?.value;
             const maxP = document.getElementById('qc_max_price')?.value;
-            const ptypes = document.getElementById('qc_ptypes')?.value;
-            const cond = document.getElementById('qc_condition')?.value;
+            const ptypes = Array.from(document.querySelectorAll('#qc_ptypes .toggle-active')).map(b => b.dataset.val).join(',');
+            const cond = Array.from(document.querySelectorAll('#qc_condition .toggle-active')).map(b => b.dataset.val).join(',');
             const strat = document.getElementById('qc_strategy')?.value;
             const fund = document.getElementById('qc_funding')?.value;
             const deals = document.getElementById('qc_deals')?.value;
